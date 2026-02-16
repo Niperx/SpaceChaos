@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Планетарный Хаос 2D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Space Chaos</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -12,6 +12,7 @@
     font-family: 'Segoe UI', Tahoma, sans-serif;
     overflow: hidden;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* ═══ Общие экраны-оверлеи ════════════════════ */
@@ -67,7 +68,7 @@
 
   /* ═══ Canvas ══════════════════════════════════ */
   #game-screen { display: none; }
-  #canvas-main { display: block; cursor: crosshair; position: relative; z-index: 1; }
+  #canvas-main { display: block; cursor: crosshair; position: relative; z-index: 1; touch-action: none; }
   #canvas-bloom {
     position: fixed; inset: 0; z-index: 0;
     pointer-events: none;
@@ -123,6 +124,15 @@
     color: #ff5252; font-weight: bold; font-size: 12px;
     padding: 4px 8px;
   }
+  .hud-protected {
+    color: #66bb6a; font-weight: bold; font-size: 11px;
+    padding: 4px 8px;
+    animation: protPulse 2s infinite;
+  }
+  @keyframes protPulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: .5; }
+  }
 
   /* ═══ Панель улучшений (слева) ════════════════ */
   #upgrade-panel {
@@ -156,6 +166,21 @@
   .upg-btn.fort .upg-name { color: #4dd0e1; }
   .upg-sep { border: none; border-top: 1px solid #222; margin: 2px 0; }
 
+  /* Кнопка-тоггл панели улучшений (только мобильная) */
+  #upg-toggle {
+    display: none;
+    position: fixed; left: 6px; z-index: 11;
+    width: 40px; height: 40px;
+    border: 1px solid #333; border-radius: 8px;
+    background: rgba(18,18,36,.94);
+    color: #7c4dff; font-size: 20px; font-weight: bold;
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  #upg-toggle:hover { background: rgba(124,77,255,.2); border-color: #7c4dff; }
+  #upg-toggle.active { background: rgba(124,77,255,.3); border-color: #7c4dff; }
+
   /* ═══ Кнопки внизу ════════════════════════════ */
   #actions {
     position: fixed; bottom: 12px; left: 50%;
@@ -185,9 +210,26 @@
     overflow-y: auto; z-index: 10;
     font-size: 11px; color: #aaa;
     pointer-events: none;
+    scrollbar-width: none;           /* Firefox */
+    -ms-overflow-style: none;        /* IE/Edge */
   }
+  #chat-box::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
   #chat-box div { margin-bottom: 2px; opacity: .8; }
   #chat-box .from { color: #7c4dff; font-weight: bold; }
+
+  /* Кнопка скрытия чата (только мобильная) */
+  #chat-toggle {
+    display: none;
+    position: fixed; z-index: 11;
+    width: 28px; height: 28px;
+    border: 1px solid #333; border-radius: 6px;
+    background: rgba(18,18,36,.92);
+    color: #888; font-size: 14px;
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  #chat-toggle:hover { background: rgba(124,77,255,.2); color: #b388ff; }
 
   /* ═══ Мини-карта ══════════════════════════════ */
   #minimap {
@@ -261,6 +303,41 @@
   #fleet-dialog .send { background: #ef5350; color: #fff; }
   #fleet-dialog .cancel { background: #333; color: #aaa; }
 
+  /* ═══ Альянс / Торговля / Лидерборд ═══════════ */
+  .panel-overlay {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 18px 24px; border-radius: 12px;
+    background: rgba(15,15,35,.97);
+    border: 1px solid #444;
+    z-index: 50; display: none;
+    min-width: 280px; max-width: 420px;
+  }
+  .panel-overlay h3 { font-size: 14px; color: #b388ff; margin-bottom: 10px; }
+  .panel-overlay input, .panel-overlay select {
+    width: 100%; padding: 8px 10px; margin-bottom: 8px;
+    border: 1px solid #555; border-radius: 6px;
+    background: #1a1a2e; color: #fff; font-size: 13px;
+  }
+  .panel-overlay .row { display: flex; gap: 8px; margin-top: 10px; }
+  .panel-overlay button {
+    padding: 7px 14px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 12px; flex: 1;
+  }
+  .panel-overlay .btn-ok { background: #7c4dff; color: #fff; }
+  .panel-overlay .btn-cancel { background: #333; color: #aaa; }
+  #alliance-panel .current { font-size: 11px; color: #888; margin-bottom: 8px; }
+  #leaderboard-panel {
+    max-height: 70vh; overflow-y: auto;
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px; min-width: 360px;
+  }
+  #leaderboard-panel .col { font-size: 11px; }
+  #leaderboard-panel .col h4 { font-size: 11px; color: #666; margin-bottom: 6px; text-transform: uppercase; }
+  #leaderboard-panel .col .row { padding: 3px 0; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
+  #leaderboard-panel .col .row .nick { color: #ccc; }
+  #leaderboard-panel .col .row .val { color: #fdd835; font-weight: bold; }
+
   /* ═══ Подсказка для новичка ════════════════════ */
   #onboarding {
     position: fixed; bottom: 50px; right: 220px;
@@ -275,6 +352,39 @@
     position: absolute; top: 4px; right: 8px;
     cursor: pointer; color: #666; font-size: 14px;
   }
+
+  /* ═══ Кнопка помощи ═════════════════════════ */
+  #help-btn {
+    position: fixed; top: 8px; right: 95px;
+    z-index: 200;
+    width: 32px; height: 28px;
+    border: 1px solid #333; border-radius: 6px;
+    background: rgba(18,18,36,.92);
+    color: #7c4dff; font-size: 16px; font-weight: bold;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  #help-btn:hover { background: rgba(124,77,255,.2); border-color: #7c4dff; color: #b388ff; }
+
+  /* ═══ Панель помощи ═════════════════════════ */
+  #help-panel {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%; max-width: 440px; max-height: 85vh;
+    padding: 20px 24px; border-radius: 12px;
+    background: rgba(15,15,35,.98);
+    border: 1px solid #444;
+    z-index: 110; display: none;
+    overflow-y: auto;
+  }
+  #help-panel h3 { font-size: 15px; color: #b388ff; margin-bottom: 12px; }
+  #help-panel .help-section { margin-bottom: 16px; }
+  #help-panel .help-section-title { font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; }
+  #help-panel .help-section p, #help-panel .help-section ul { font-size: 12px; color: #bbb; line-height: 1.6; margin: 0 0 6px 0; }
+  #help-panel .help-section ul { padding-left: 18px; }
+  #help-panel .help-section li { margin-bottom: 4px; }
+  #help-panel .help-close { margin-top: 14px; padding: 8px 24px; width: 100%; border: none; border-radius: 6px; background: #333; color: #aaa; cursor: pointer; font-size: 13px; }
+  #help-panel .help-close:hover { background: #444; color: #fff; }
 
   /* ═══ Переключатель языка ═══════════════════ */
   #lang-toggle {
@@ -295,19 +405,152 @@
     color: #b388ff;
   }
   #lang-toggle .lang-opt:hover:not(.active) { color: #aaa; }
+
+  /* ═══ Мобильная вёрстка ═══════════════════════════════════ */
+  @media (max-width: 768px) {
+    .overlay h1 { font-size: 32px; }
+    .overlay .sub { font-size: 12px; margin-bottom: 14px; }
+    .overlay input[type=text] { width: 90%; max-width: 280px; padding: 12px 14px; font-size: 16px; }
+    .overlay .big-btn { padding: 12px 32px; font-size: 15px; }
+    .death-stats { padding: 12px 16px; font-size: 13px; }
+    .death-stats .killer { font-size: 14px; }
+
+    #hud {
+      flex-wrap: wrap; height: auto; min-height: 38px; padding: 6px 6px 8px;
+      gap: 2px 0;
+      padding-top: max(6px, env(safe-area-inset-top));
+    }
+    #hud .nick-label { font-size: 12px; padding: 0 8px 0 2px; }
+    .hud-item { padding: 4px 6px; font-size: 11px; }
+    .hud-icon { font-size: 12px; }
+    .hud-val { font-size: 12px; }
+    .hud-item .hud-label { font-size: 9px; }
+    .hud-cd { font-size: 11px; padding: 4px 6px; }
+
+    #upg-toggle {
+      display: flex;
+      bottom: max(120px, calc(env(safe-area-inset-bottom) + 114px));
+    }
+
+    #upgrade-panel {
+      left: 6px; width: 150px;
+      top: auto; bottom: max(166px, calc(env(safe-area-inset-bottom) + 160px));
+      transform: none;
+      gap: 4px;
+      display: none;
+    }
+    #upgrade-panel.mobile-open { display: flex; }
+    .upg-btn { padding: 6px 8px; font-size: 10px; }
+    .upg-name { font-size: 11px; }
+    .upg-desc { font-size: 8px; }
+    .upg-cost { font-size: 9px; }
+
+    #actions {
+      bottom: max(8px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      flex-wrap: wrap; justify-content: center; gap: 6px;
+      max-width: 100%; padding: 0 8px;
+    }
+    .action-btn { padding: 10px 12px; font-size: 11px; min-height: 44px; }
+    .action-btn .key { display: none; }
+
+    #chat-box {
+      width: calc(100% - 20px); max-width: 280px;
+      max-height: 100px; bottom: 60px;
+      font-size: 10px;
+    }
+    #chat-box.hidden { display: none; }
+    #chat-toggle {
+      display: flex;
+      left: 10px; bottom: max(60px, calc(env(safe-area-inset-bottom) + 54px));
+    }
+
+    #minimap {
+      width: 140px; height: 105px;
+      right: max(6px, env(safe-area-inset-right));
+      bottom: max(6px, env(safe-area-inset-bottom));
+    }
+
+    #attack-hint, #info-toast {
+      top: max(46px, env(safe-area-inset-top, 0px));
+      font-size: 11px; padding: 6px 12px;
+      max-width: 90%;
+    }
+
+    #help-btn { top: max(8px, env(safe-area-inset-top, 0px)); right: 80px; width: 36px; height: 32px; font-size: 18px; }
+    #lang-toggle { top: max(8px, env(safe-area-inset-top, 0px)); font-size: 11px; }
+    #lang-toggle .lang-opt { padding: 6px 8px; }
+
+    #help-panel { width: 94%; padding: 16px; max-height: 88vh; }
+    #help-panel .help-section p, #help-panel .help-section ul { font-size: 11px; }
+    .panel-overlay { width: 94%; min-width: 0; padding: 14px 16px; }
+    #leaderboard-panel { grid-template-columns: 1fr; min-width: 0; gap: 10px; }
+    #fleet-dialog { min-width: 0; width: 92%; padding: 16px 20px; }
+    #fleet-dialog input { width: 100%; max-width: 140px; }
+    #fleet-dialog .btns { flex-wrap: wrap; justify-content: center; }
+
+    #onboarding {
+      width: calc(100% - 24px); max-width: 280px;
+      bottom: 70px; right: auto; left: 50%; transform: translateX(-50%);
+      padding: 12px 14px; font-size: 11px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .overlay h1 { font-size: 26px; }
+    .overlay input[type=text] { font-size: 16px; }
+
+    #hud .nick-label { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hud-item .hud-label { display: none; }
+
+    #upgrade-panel { width: 130px; bottom: max(158px, calc(env(safe-area-inset-bottom) + 152px)); }
+    .upg-section-title { font-size: 8px; }
+    .upg-btn { padding: 6px 6px; }
+    .upg-desc { display: none; }
+    #upg-toggle { bottom: max(114px, calc(env(safe-area-inset-bottom) + 108px)); }
+
+    #actions { bottom: max(6px, env(safe-area-inset-bottom)); }
+    .action-btn { padding: 10px 10px; font-size: 10px; min-height: 44px; }
+    .action-btn span:not(.key) { max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
+
+    #chat-box { max-height: 80px; font-size: 9px; }
+    #minimap { width: 100px; height: 75px; right: max(4px, env(safe-area-inset-right)); bottom: max(4px, env(safe-area-inset-bottom)); }
+
+    #help-btn { right: 68px; width: 34px; height: 30px; }
+    #lang-toggle .lang-opt { padding: 6px 6px; }
+
+    .panel-overlay .row { flex-wrap: wrap; }
+    .panel-overlay button { min-width: 0; }
+    #alliance-panel .row button, #trade-panel .row button { flex: 1 1 45%; }
+  }
 </style>
 </head>
 <body>
 
+<!-- ═══ Кнопка помощи ═══ -->
+<button type="button" id="help-btn" title="Помощь">?</button>
 <!-- ═══ Переключатель языка ═══ -->
 <div id="lang-toggle">
   <span class="lang-opt active" data-lang="ru">RU</span>
   <span class="lang-opt" data-lang="en">EN</span>
 </div>
 
+<!-- ═══ Панель помощи (доступна с любого экрана) ═══ -->
+<div id="help-panel">
+  <h3 id="help-title">Помощь</h3>
+  <div class="help-section">
+    <div class="help-section-title" id="help-how-title">Как играть</div>
+    <div id="help-how-content"></div>
+  </div>
+  <div class="help-section">
+    <div class="help-section-title" id="help-res-title">Ресурсы и показатели</div>
+    <div id="help-res-content"></div>
+  </div>
+  <button type="button" class="help-close" id="help-close">Закрыть</button>
+</div>
+
 <!-- ═══ Экран входа ═══ -->
 <div class="overlay" id="login-screen">
-  <h1 id="login-title">Планетарный Хаос</h1>
+  <h1 id="login-title">Space Chaos</h1>
   <p class="sub" id="login-sub">Многопользовательская космическая стратегия</p>
   <input id="nick-input" type="text" placeholder="Ваш никнейм" maxlength="16" autofocus>
   <button class="big-btn" id="join-btn">Начать игру</button>
@@ -336,6 +579,10 @@
   <!-- HUD -->
   <div id="hud">
     <div class="nick-label" id="hud-nick"></div>
+    <div class="hud-item" id="hud-alliance-wrap" style="display:none">
+      <span class="hud-icon">&#128101;</span>
+      <span class="hud-val" id="hud-alliance">—</span>
+    </div>
 
     <div class="hud-item">
       <span class="hud-icon">&#9733;</span>
@@ -382,8 +629,11 @@
     <div class="hud-cd" id="hud-cd" style="display:none">
       &#9201; <span id="hud-cd-val">0</span><span id="hud-cd-unit">с</span>
     </div>
+    <div class="hud-protected" id="hud-protected" style="display:none">&#9752; Под защитой</div>
   </div>
 
+  <!-- Кнопка-тоггл панели улучшений (мобильная) -->
+  <button type="button" id="upg-toggle" title="Улучшения">&#9733;</button>
   <!-- Панель улучшений -->
   <div id="upgrade-panel">
     <div class="upg-section-title" id="upg-title">Улучшения</div>
@@ -427,9 +677,13 @@
   <div id="actions">
     <button class="action-btn" id="btn-center"><span class="key">Space</span> <span id="act-center">Моя планета</span></button>
     <button class="action-btn" id="btn-attack-mode"><span class="key">Click</span> <span id="act-attack">Режим атаки</span></button>
+    <button class="action-btn" id="btn-alliance">&#128101; Альянс</button>
+    <button class="action-btn" id="btn-trade">&#128230; Торговля</button>
+    <button class="action-btn" id="btn-leaderboard">&#127942; Топ-10</button>
     <button class="action-btn danger" id="btn-destruct"><span id="act-destruct">Самоуничтожение</span></button>
   </div>
 
+  <button type="button" id="chat-toggle" title="Скрыть/показать чат">&#128172;</button>
   <div id="chat-box"></div>
   <canvas id="minimap" width="200" height="150"></canvas>
   <div id="attack-hint">&#9876; Кликните по чужой планете, чтобы отправить флот</div>
@@ -446,6 +700,46 @@
     &#9876; Кликни свою планету, затем чужую — атака!<br>
     &#9711; Покупай щит для защиты от врагов<br>
     &#9730; Качай укрепление для авто-восстановления щита</span>
+  </div>
+
+  <!-- Панель альянса -->
+  <div class="panel-overlay" id="alliance-panel">
+    <h3>&#128101; Альянс</h3>
+    <div class="current" id="alliance-current">Сейчас: нет</div>
+    <input type="text" id="alliance-name-input" placeholder="Название альянса (2–20 символов)" maxlength="20">
+    <div class="row">
+      <button class="btn-ok" id="alliance-create">Создать</button>
+      <button class="btn-ok" id="alliance-join">Вступить</button>
+      <button class="btn-cancel" id="alliance-leave">Выйти</button>
+      <button class="btn-cancel" id="alliance-close">Закрыть</button>
+    </div>
+  </div>
+  <!-- Панель торговли -->
+  <div class="panel-overlay" id="trade-panel">
+    <h3>&#128230; Передать ресурсы</h3>
+    <select id="trade-player-select"><option value="">Выберите игрока</option></select>
+    <input type="number" id="trade-amount-input" min="1" placeholder="Сумма res">
+    <div class="row">
+      <button class="btn-ok" id="trade-send">Отправить</button>
+      <button class="btn-cancel" id="trade-close">Закрыть</button>
+    </div>
+  </div>
+  <!-- Лидерборд -->
+  <div class="panel-overlay" id="leaderboard-panel">
+    <h3 style="grid-column:1/-1">&#127942; Топ-10</h3>
+    <div class="col">
+      <h4>По уровню</h4>
+      <div id="leader-lvl"></div>
+    </div>
+    <div class="col">
+      <h4>По ресурсам</h4>
+      <div id="leader-res"></div>
+    </div>
+    <div class="col">
+      <h4>По победам</h4>
+      <div id="leader-wins"></div>
+    </div>
+    <button class="btn-cancel" id="leaderboard-close" style="grid-column:1/-1; margin-top:8px">Закрыть</button>
   </div>
 
   <!-- Диалог отправки флота -->
@@ -465,7 +759,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
-// Клиент — Планетарный Хаос 2D v0.6
+// Клиент — Space Chaos v0.7
 // ═══════════════════════════════════════════════════════════
 (() => {
   'use strict';
@@ -509,11 +803,21 @@
   const fleetCountInput = document.getElementById('fleet-count-input');
   const fleetAvailSpan  = document.getElementById('fleet-avail');
 
+  const alliancePanel = document.getElementById('alliance-panel');
+  const allianceCurrent = document.getElementById('alliance-current');
+  const allianceNameInput = document.getElementById('alliance-name-input');
+  const tradePanel = document.getElementById('trade-panel');
+  const tradePlayerSelect = document.getElementById('trade-player-select');
+  const tradeAmountInput = document.getElementById('trade-amount-input');
+  const leaderboardPanel = document.getElementById('leaderboard-panel');
+  const hudAllianceWrap = document.getElementById('hud-alliance-wrap');
+  const hudAlliance = document.getElementById('hud-alliance');
+
   // ── Локализация (RU/EN) ─────────────────────────────────
   const L10N = {
     ru: {
-      pageTitle: 'Планетарный Хаос 2D',
-      loginTitle: 'Планетарный Хаос',
+      pageTitle: 'Space Chaos',
+      loginTitle: 'Space Chaos',
       loginSub: 'Многопользовательская космическая стратегия',
       nickPlaceholder: 'Ваш никнейм',
       joinBtn: 'Начать игру',
@@ -548,10 +852,21 @@
       fleetCountPlaceholder: 'Кол-во кораблей',
       confirmDestruct: 'Самоуничтожить планету? Все данные будут потеряны.',
       fleetSentToast: 'Флот отправлен: {0} кораблей, прибытие ~{1}с',
+      minerSentToast: 'Добытчик отправлен к астероиду',
+      helpTitle: 'Помощь',
+      helpHowTitle: 'Как играть',
+      helpHowContent: '<ul><li><b>★ Экономика</b> — улучшай уровень, чтобы получать больше ресурсов в секунду</li><li><b>✈ Корабли</b> — покупай за ресурсы; нужны для атаки и отправки добытчика на астероид</li><li><b>◆ Астероиды</b> — кликни по астероиду: один корабль полетит добывать ресурсы и вернётся с грузом</li><li><b>⚔ Атака</b> — нажми «Режим атаки», кликни свою планету, затем чужую и выбери количество кораблей</li><li><b>☂ Щит</b> — покупай защиту, чтобы выдержать атаку врага</li><li><b>☀ Укрепление</b> — улучшай для увеличения макс. щита и его авто-восстановления</li><li><b>🤝 Альянс</b> — создай или вступи в альянс; при атаке на союзника ваш общий флот и щит считаются вместе</li><li><b>📦 Торговля</b> — передавай ресурсы другим игрокам</li><li><b>Space</b> — центрировать камеру на своей планете. <b>Колёсико мыши</b> — зум. <b>ПКМ</b> — перемещение карты</li></ul>',
+      helpResTitle: 'Ресурсы и показатели',
+      helpResContent: '<p><b>◆ Ресурсы (res)</b> — основная валюта. Получаешь каждый секунду по уровню экономики, с астероидов и при победе в атаке (50% ресурсов врага). Тратятся на улучшения, корабли и щит.</p><p><b>★ Уровень (lvl)</b> — уровень экономики. Чем выше, тем больше res/сек (+8 за уровень).</p><p><b>✈ Флот</b> — корабли. Атакуют врагов и добывают астероиды (1 корабль = 1 добытчик). Покупка: 10 res за корабль.</p><p><b>☂ Щит (defense)</b> — защита планеты. Складывается с флотом при расчёте обороны. Покупка: 15 res за единицу. Восстанавливается сам при прокачанном Укреплении.</p><p><b>⚔ Военный уровень</b> — даёт +5% силы атаки и +10% скорости флота за уровень.</p><p><b>☀ Укрепление</b> — увеличивает макс. щит и скорость его восстановления.</p>',
+      helpClose: 'Закрыть',
+      helpBtnTitle: 'Помощь: как играть и что значат ресурсы',
+      protectedLabel: 'Под защитой',
+      protectedAttackMsg: 'Этот игрок под защитой новичка!',
+      protectedHud: 'Защита новичка',
     },
     en: {
-      pageTitle: 'Planetary Chaos 2D',
-      loginTitle: 'Planetary Chaos',
+      pageTitle: 'Space Chaos',
+      loginTitle: 'Space Chaos',
       loginSub: 'Multiplayer space strategy',
       nickPlaceholder: 'Your nickname',
       joinBtn: 'Start game',
@@ -586,6 +901,17 @@
       fleetCountPlaceholder: 'Ship count',
       confirmDestruct: 'Self-destruct planet? All data will be lost.',
       fleetSentToast: 'Fleet sent: {0} ships, ETA ~{1}s',
+      minerSentToast: 'Miner sent to asteroid',
+      helpTitle: 'Help',
+      helpHowTitle: 'How to play',
+      helpHowContent: '<ul><li><b>★ Economy</b> — upgrade level to earn more resources per second</li><li><b>✈ Ships</b> — buy with resources; used for attack and sending a miner to an asteroid</li><li><b>◆ Asteroids</b> — click an asteroid: one ship will mine it and return with cargo</li><li><b>⚔ Attack</b> — press «Attack mode», click your planet, then an enemy planet and choose ship count</li><li><b>☂ Shield</b> — buy defense to survive enemy attacks</li><li><b>☀ Fortification</b> — upgrade to increase max shield and its auto-regen</li><li><b>🤝 Alliance</b> — create or join an alliance; when attacked, your combined fleet and shield count together</li><li><b>📦 Trade</b> — send resources to other players</li><li><b>Space</b> — center camera on your planet. <b>Mouse wheel</b> — zoom. <b>Right mouse</b> — pan the map</li></ul>',
+      helpResTitle: 'Resources and stats',
+      helpResContent: '<p><b>◆ Resources (res)</b> — main currency. You get them every second from economy level, from asteroids, and by winning attacks (50% of enemy res). Spent on upgrades, ships, and shield.</p><p><b>★ Level (lvl)</b> — economy level. Higher = more res/sec (+8 per level).</p><p><b>✈ Fleet</b> — ships. Used to attack and to mine asteroids (1 ship = 1 miner). Cost: 10 res per ship.</p><p><b>☂ Shield (defense)</b> — planet defense. Added to fleet when calculating defense. Cost: 15 res per unit. Regenerates with Fortification.</p><p><b>⚔ Military level</b> — +5% attack power and +10% fleet speed per level.</p><p><b>☀ Fortification</b> — increases max shield and its regeneration rate.</p>',
+      helpClose: 'Close',
+      helpBtnTitle: 'Help: how to play and what resources mean',
+      protectedLabel: 'Protected',
+      protectedAttackMsg: 'This player is under newbie protection!',
+      protectedHud: 'Newbie shield',
     },
   };
 
@@ -656,6 +982,15 @@
     attackHint.textContent = tr.attackHint;
     document.getElementById('onb-title').textContent = tr.onbTitle;
     document.getElementById('onb-tips').innerHTML = tr.onbTips;
+    const helpTitle = document.getElementById('help-title');
+    const helpBtn = document.getElementById('help-btn');
+    if (helpTitle) helpTitle.textContent = tr.helpTitle;
+    if (helpBtn) helpBtn.title = tr.helpBtnTitle;
+    document.getElementById('help-how-title').textContent = tr.helpHowTitle;
+    document.getElementById('help-how-content').innerHTML = tr.helpHowContent;
+    document.getElementById('help-res-title').textContent = tr.helpResTitle;
+    document.getElementById('help-res-content').innerHTML = tr.helpResContent;
+    document.getElementById('help-close').textContent = tr.helpClose;
 
     document.getElementById('fd-title').textContent = tr.fdTitle;
     document.getElementById('fd-avail-label').textContent = tr.fdAvailLabel;
@@ -684,22 +1019,49 @@
   let missionsArr = [];
   let asteroidsArr = [];
   let camera = { x: 0, y: 0 };
+  let zoom = 1;
+  const ZOOM_MIN = 0.35;
+  const ZOOM_MAX = 2;
   let selecting = false;
   let selectedTarget = null;
   let animFrame = 0;
   let explosions = [];
   let comets = [];
   let needCenterOnSelf = false;
+  let minerTargetEffects = []; // { asteroidId, startTime } — пульс на астероиде ~2 сек
 
-  const MAP_W = 4000;
-  const MAP_H = 3000;
+  let MAP_W = 4000;
+  let MAP_H = 3000;
+  const MAP_VISUAL_MAX_W = 10000;
+  const MAP_VISUAL_MAX_H = 7500;
   const LVL_COST_BASE = 100;
   const LVL_COST_MULT = 1.6;
   const MIL_COST_BASE = 120;
   const MIL_COST_MULT = 1.7;
   const FORT_COST_BASE = 100;
   const FORT_COST_MULT = 1.5;
+  const FLEET_COST_BASE = 10;
+  const FLEET_COST_MULT = 1.01;
+  const DEFENSE_COST_BASE = 15;
+  const DEFENSE_COST_MULT = 1.01;
+  const NEWBIE_PROTECTION_LVL = 6;
+  const NEWBIE_PROTECTION_TIME = 300000;
   const ATTACK_COOLDOWN = 30000;
+
+  function fleetBuyCostClient(currentFleet, amount) {
+    let total = 0;
+    for (let i = 0; i < amount; i++) total += Math.floor(FLEET_COST_BASE * Math.pow(FLEET_COST_MULT, currentFleet + i));
+    return total;
+  }
+  function defenseBuyCostClient(currentDef, amount) {
+    let total = 0;
+    for (let i = 0; i < amount; i++) total += Math.floor(DEFENSE_COST_BASE * Math.pow(DEFENSE_COST_MULT, currentDef + i));
+    return total;
+  }
+  function isProtectedClient(p) {
+    if (!p) return false;
+    return p.isProtected === true;
+  }
 
   const socket = io();
 
@@ -708,15 +1070,16 @@
   // ═══════════════════════════════════════════════════════
 
   const starLayers = [
-    { stars: [], speed: 0.3, count: 200, maxR: 1.0, alpha: 0.3 },
-    { stars: [], speed: 0.6, count: 150, maxR: 1.5, alpha: 0.5 },
-    { stars: [], speed: 1.0, count: 100, maxR: 2.0, alpha: 0.8 }
+    { stars: [], speed: 0.3, count: 400, maxR: 1.0, alpha: 0.3 },
+    { stars: [], speed: 0.6, count: 300, maxR: 1.5, alpha: 0.5 },
+    { stars: [], speed: 1.0, count: 200, maxR: 2.0, alpha: 0.8 }
   ];
   for (const layer of starLayers) {
+    // Генерируем звёзды в огромной области (в 3 раза больше карты)
     for (let i = 0; i < layer.count; i++) {
       layer.stars.push({
-        x: Math.random() * MAP_W * 1.5,
-        y: Math.random() * MAP_H * 1.5,
+        x: Math.random() * MAP_VISUAL_MAX_W * 3,
+        y: Math.random() * MAP_VISUAL_MAX_H * 3,
         r: Math.random() * layer.maxR + 0.2,
         flicker: Math.random() * Math.PI * 2
       });
@@ -726,8 +1089,8 @@
   const nebulae = [];
   for (let i = 0; i < 6; i++) {
     nebulae.push({
-      x: Math.random() * MAP_W,
-      y: Math.random() * MAP_H,
+      x: Math.random() * MAP_VISUAL_MAX_W,
+      y: Math.random() * MAP_VISUAL_MAX_H,
       r: 200 + Math.random() * 400,
       hue: Math.random() * 360,
       alpha: 0.03 + Math.random() * 0.04
@@ -735,10 +1098,12 @@
   }
 
   function spawnComet() {
+    // Спавн далеко за пределами карты, чтобы при макс. отдалении не было видно появления
+    const margin = 800;
     const fromLeft = Math.random() > 0.5;
     return {
-      x: fromLeft ? -50 : MAP_W + 50,
-      y: Math.random() * MAP_H,
+      x: fromLeft ? -margin : MAP_W + margin,
+      y: -margin + Math.random() * (MAP_H + margin * 2),
       vx: (fromLeft ? 1 : -1) * (1.5 + Math.random() * 2),
       vy: (Math.random() - 0.5) * 0.8,
       tailLen: 40 + Math.random() * 60,
@@ -802,13 +1167,42 @@
     localStorage.setItem('onboardingSeen', '1');
   });
 
+  // Тоггл панели улучшений (мобильные)
+  const upgToggle = document.getElementById('upg-toggle');
+  const upgradePanel = document.getElementById('upgrade-panel');
+  upgToggle.addEventListener('click', () => {
+    const isOpen = upgradePanel.classList.toggle('mobile-open');
+    upgToggle.classList.toggle('active', isOpen);
+  });
+
+  // Тоггл чата (мобильные)
+  const chatToggle = document.getElementById('chat-toggle');
+  chatToggle.addEventListener('click', () => {
+    chatBox.classList.toggle('hidden');
+  });
+
+  const helpPanel = document.getElementById('help-panel');
+  document.getElementById('help-btn').addEventListener('click', () => {
+    helpPanel.style.display = 'block';
+  });
+  document.getElementById('help-close').addEventListener('click', () => {
+    helpPanel.style.display = 'none';
+  });
+
   // ═══════════════════════════════════════════════════════
   // СОБЫТИЯ СЕРВЕРА
   // ═══════════════════════════════════════════════════════
 
-  socket.on('state', (list) => {
-    playersArr = list;
+  socket.on('state', (data) => {
+    if (Array.isArray(data)) {
+      playersArr = data;
+    } else {
+      if (data.list) playersArr = data.list;
+      if (data.mapW != null) MAP_W = data.mapW;
+      if (data.mapH != null) MAP_H = data.mapH;
+    }
     updateHUD();
+    updateTradePlayerSelect();
     if (needCenterOnSelf) { centerOnSelf(); needCenterOnSelf = false; }
   });
 
@@ -821,6 +1215,11 @@
   socket.on('upgraded', () => updateHUD());
   socket.on('fleetBought', () => updateHUD());
   socket.on('defenseBought', () => updateHUD());
+  socket.on('minerSent', (data) => {
+    updateHUD();
+    showToast(t('minerSentToast'));
+    if (data && data.asteroidId) minerTargetEffects.push({ asteroidId: data.asteroidId, startTime: Date.now() });
+  });
 
   socket.on('attackResult', (data) => {
     selecting = false;
@@ -874,14 +1273,38 @@
     hudDef.textContent = me.defense;
     hudMil.textContent = me.militaryLvl;
     hudFort.textContent = me.fortLvl;
+    if (me.allianceName) {
+      hudAllianceWrap.style.display = '';
+      hudAlliance.textContent = me.allianceName;
+    } else {
+      hudAllianceWrap.style.display = 'none';
+    }
+
+    // Защита новичка в HUD
+    const protEl = document.getElementById('hud-protected');
+    if (protEl) {
+      if (isProtectedClient(me)) {
+        protEl.style.display = '';
+        protEl.textContent = t('protectedHud');
+      } else {
+        protEl.style.display = 'none';
+      }
+    }
 
     const resShort = t('resShort');
     document.getElementById('cost-eco').textContent =
-      `${Math.floor(LVL_COST_BASE * Math.pow(LVL_COST_MULT, me.lvl - 1))} ${resShort}.`;
+      `${Math.floor(LVL_COST_BASE * Math.pow(LVL_COST_MULT, me.lvl - 1))} ${resShort}`;
     document.getElementById('cost-mil').textContent =
-      `${Math.floor(MIL_COST_BASE * Math.pow(MIL_COST_MULT, me.militaryLvl))} ${resShort}.`;
+      `${Math.floor(MIL_COST_BASE * Math.pow(MIL_COST_MULT, me.militaryLvl))} ${resShort}`;
     document.getElementById('cost-fort').textContent =
-      `${Math.floor(FORT_COST_BASE * Math.pow(FORT_COST_MULT, me.fortLvl))} ${resShort}.`;
+      `${Math.floor(FORT_COST_BASE * Math.pow(FORT_COST_MULT, me.fortLvl))} ${resShort}`;
+    // Динамические цены кораблей/щитов
+    document.getElementById('buy-f1-cost').textContent =
+      `${fleetBuyCostClient(me.fleet, 1)} ${resShort}`;
+    document.getElementById('buy-f10-cost').textContent =
+      `${fleetBuyCostClient(me.fleet, 10)} ${resShort}`;
+    document.getElementById('buy-d5-cost').textContent =
+      `${defenseBuyCostClient(me.defense, 5)} ${resShort}`;
   }
 
   // Кулдаун
@@ -928,6 +1351,73 @@
     selecting = !selecting;
     attackHint.style.display = selecting ? 'block' : 'none';
   });
+  // Альянс / Торговля / Лидерборд
+  function openPanel(panel) {
+    alliancePanel.style.display = 'none';
+    tradePanel.style.display = 'none';
+    leaderboardPanel.style.display = 'none';
+    if (panel) panel.style.display = 'block';
+  }
+  function updateTradePlayerSelect() {
+    const currentValue = tradePlayerSelect.value; // Сохраняем выбор
+    const me = playersArr.find(p => p.nick === myNick);
+    const others = playersArr.filter(p => p.nick !== myNick && p.nick);
+    tradePlayerSelect.innerHTML = '<option value="">Выберите игрока</option>' +
+      others.map(p => `<option value="${p.nick}">${p.nick} (${p.res} res)</option>`).join('');
+    if (currentValue && others.some(p => p.nick === currentValue)) {
+      tradePlayerSelect.value = currentValue; // Восстанавливаем, если игрок всё ещё в списке
+    }
+  }
+  function fillLeaderboard() {
+    const byLvl = [...playersArr].sort((a,b) => (b.lvl||0) - (a.lvl||0)).slice(0, 10);
+    const byRes = [...playersArr].sort((a,b) => (b.res||0) - (a.res||0)).slice(0, 10);
+    const byWins = [...playersArr].sort((a,b) => (b.wins||0) - (a.wins||0)).slice(0, 10);
+    document.getElementById('leader-lvl').innerHTML = byLvl.map((p,i) => `<div class="row"><span class="nick">${i+1}. ${p.nick}</span><span class="val">${p.lvl}</span></div>`).join('');
+    document.getElementById('leader-res').innerHTML = byRes.map((p,i) => `<div class="row"><span class="nick">${i+1}. ${p.nick}</span><span class="val">${p.res}</span></div>`).join('');
+    document.getElementById('leader-wins').innerHTML = byWins.map((p,i) => `<div class="row"><span class="nick">${i+1}. ${p.nick}</span><span class="val">${p.wins||0}</span></div>`).join('');
+  }
+  document.getElementById('btn-alliance').addEventListener('click', () => {
+    const me = playersArr.find(p => p.nick === myNick);
+    allianceCurrent.textContent = me && me.allianceName ? `Сейчас: «${me.allianceName}»` : 'Сейчас: нет';
+    allianceNameInput.value = me && me.allianceName ? me.allianceName : '';
+    openPanel(alliancePanel);
+  });
+  document.getElementById('alliance-create').addEventListener('click', () => {
+    const name = allianceNameInput.value.trim();
+    if (!name) return;
+    socket.emit('createAlliance', name, (r) => { if (r && r.ok) openPanel(null); else if (r && r.msg) showToast(r.msg); });
+  });
+  document.getElementById('alliance-join').addEventListener('click', () => {
+    const name = allianceNameInput.value.trim();
+    if (!name) return;
+    socket.emit('joinAlliance', name, (r) => { if (r && r.ok) openPanel(null); else if (r && r.msg) showToast(r.msg); });
+  });
+  document.getElementById('alliance-leave').addEventListener('click', () => {
+    socket.emit('leaveAlliance', (r) => { if (r && r.ok) openPanel(null); });
+  });
+  document.getElementById('alliance-close').addEventListener('click', () => openPanel(null));
+  document.getElementById('btn-trade').addEventListener('click', () => {
+    updateTradePlayerSelect();
+    tradeAmountInput.value = '';
+    openPanel(tradePanel);
+  });
+  document.getElementById('trade-send').addEventListener('click', () => {
+    const to = tradePlayerSelect.value;
+    const amount = parseInt(tradeAmountInput.value, 10);
+    if (!to || !amount || amount < 1) { showToast('Укажите игрока и сумму'); return; }
+    socket.emit('trade', { to, amount }, (r) => {
+      if (r && r.ok) { openPanel(null); showToast('Ресурсы отправлены'); }
+      else if (r && r.msg) showToast(r.msg);
+    });
+  });
+  document.getElementById('trade-close').addEventListener('click', () => openPanel(null));
+  document.getElementById('btn-leaderboard').addEventListener('click', () => {
+    fillLeaderboard();
+    openPanel(null);
+    leaderboardPanel.style.display = 'grid';
+  });
+  document.getElementById('leaderboard-close').addEventListener('click', () => openPanel(null));
+
   document.getElementById('btn-destruct').addEventListener('click', () => {
     if (confirm(t('confirmDestruct'))) socket.emit('selfDestruct');
   });
@@ -940,17 +1430,34 @@
       selecting = false;
       attackHint.style.display = 'none';
       fleetDialog.style.display = 'none';
+      if (helpPanel.style.display === 'block') helpPanel.style.display = 'none';
+      else if (alliancePanel.style.display === 'block') openPanel(null);
+      else if (tradePanel.style.display === 'block') openPanel(null);
+      else if (leaderboardPanel.style.display === 'grid') openPanel(null);
     }
   });
 
-  // ── Камера ──────────────────────────────────────────────
+  // ── Камера и зум ────────────────────────────────────────
   function centerOnSelf() {
     const me = playersArr.find(p => p.nick === myNick);
     if (me) {
-      camera.x = me.x - canvas.width / 2;
-      camera.y = me.y - canvas.height / 2;
+      camera.x = me.x - canvas.width / (2 * zoom);
+      camera.y = me.y - canvas.height / (2 * zoom);
     }
   }
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.12 : 0.12;
+    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta));
+    if (newZoom === zoom) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    const wx = camera.x + sx / zoom, wy = camera.y + sy / zoom;
+    zoom = newZoom;
+    camera.x = wx - sx / zoom;
+    camera.y = wy - sy / zoom;
+  }, { passive: false });
 
   let dragging = false, dragStart = { x: 0, y: 0 };
 
@@ -959,19 +1466,100 @@
   });
   canvas.addEventListener('mousemove', (e) => {
     if (dragging) {
-      camera.x -= e.clientX - dragStart.x;
-      camera.y -= e.clientY - dragStart.y;
+      camera.x -= (e.clientX - dragStart.x) / zoom;
+      camera.y -= (e.clientY - dragStart.y) / zoom;
       dragStart = { x: e.clientX, y: e.clientY };
     }
   });
   canvas.addEventListener('mouseup', (e) => { if (e.button === 2) dragging = false; });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // ── Клик по canvas ──────────────────────────────────────
+  // ── Тач-события: перемещение камеры + пинч-зум (мобильные) ──
+  let touchDragging = false;
+  let touchStart = { x: 0, y: 0 };
+  let touchMoved = false;
+  let pinching = false;
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  let pinchCenter = { x: 0, y: 0 };
+
+  function getTouchDist(t1, t2) {
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function getTouchCenter(t1, t2) {
+    return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+  }
+
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      // Начало пинч-зума
+      pinching = true;
+      touchDragging = false;
+      pinchStartDist = getTouchDist(e.touches[0], e.touches[1]);
+      pinchStartZoom = zoom;
+      pinchCenter = getTouchCenter(e.touches[0], e.touches[1]);
+    } else if (e.touches.length === 1 && !pinching) {
+      touchDragging = true;
+      touchMoved = false;
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (pinching && e.touches.length === 2) {
+      // Пинч-зум
+      e.preventDefault();
+      const curDist = getTouchDist(e.touches[0], e.touches[1]);
+      const scale = curDist / pinchStartDist;
+      const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinchStartZoom * scale));
+      if (newZoom !== zoom) {
+        const rect = canvas.getBoundingClientRect();
+        const center = getTouchCenter(e.touches[0], e.touches[1]);
+        const sx = center.x - rect.left, sy = center.y - rect.top;
+        const wx = camera.x + sx / zoom, wy = camera.y + sy / zoom;
+        zoom = newZoom;
+        camera.x = wx - sx / zoom;
+        camera.y = wy - sy / zoom;
+      }
+      return;
+    }
+    if (!touchDragging || e.touches.length !== 1) return;
+    const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+    const dx = tx - touchStart.x, dy = ty - touchStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchMoved = true;
+    if (touchMoved) {
+      camera.x -= dx / zoom;
+      camera.y -= dy / zoom;
+      touchStart = { x: tx, y: ty };
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) pinching = false;
+    if (touchDragging && !touchMoved && e.changedTouches.length === 1 && e.touches.length === 0) {
+      // Если не двигали — эмулируем клик
+      const t = e.changedTouches[0];
+      const clickEvent = new MouseEvent('click', {
+        clientX: t.clientX, clientY: t.clientY,
+        bubbles: true
+      });
+      canvas.dispatchEvent(clickEvent);
+    }
+    if (e.touches.length === 0) {
+      touchDragging = false;
+      touchMoved = false;
+    }
+  }, { passive: true });
+
+  // ── Клик по canvas (экран → мир с учётом зума) ───────────
   canvas.addEventListener('click', (e) => {
     if (fleetDialog.style.display === 'block') return;
-    const wx = e.clientX + camera.x;
-    const wy = e.clientY + camera.y;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    const wx = camera.x + sx / zoom;
+    const wy = camera.y + sy / zoom;
 
     // Астероиды
     for (const a of asteroidsArr) {
@@ -993,6 +1581,10 @@
           return;
         }
         if (selecting) {
+          if (isProtectedClient(p)) {
+            showToast(t('protectedAttackMsg'));
+            return;
+          }
           openFleetDialog(p.nick);
           return;
         }
@@ -1091,29 +1683,33 @@
 
   function drawNebulae() {
     for (const n of nebulae) {
-      const sx = n.x - camera.x, sy = n.y - camera.y;
-      if (sx < -n.r*2 || sx > canvas.width+n.r*2 || sy < -n.r*2 || sy > canvas.height+n.r*2) continue;
-      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, n.r);
+      const sx = (n.x - camera.x) * zoom, sy = (n.y - camera.y) * zoom;
+      const nr = n.r * zoom;
+      if (sx < -nr*2 || sx > canvas.width+nr*2 || sy < -nr*2 || sy > canvas.height+nr*2) continue;
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, nr);
       grad.addColorStop(0, `hsla(${n.hue}, 60%, 40%, ${n.alpha})`);
       grad.addColorStop(0.5, `hsla(${n.hue+30}, 50%, 30%, ${n.alpha*0.5})`);
       grad.addColorStop(1, `hsla(${n.hue}, 40%, 20%, 0)`);
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(sx, sy, n.r, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy, nr, 0, Math.PI*2); ctx.fill();
       bloomCtx.fillStyle = grad;
-      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, n.r, 0, Math.PI*2); bloomCtx.fill();
+      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, nr, 0, Math.PI*2); bloomCtx.fill();
     }
   }
 
   function drawStars() {
     for (const layer of starLayers) {
       for (const s of layer.stars) {
-        const sx = s.x - camera.x * layer.speed;
-        const sy = s.y - camera.y * layer.speed;
-        const wx = ((sx % canvas.width) + canvas.width) % canvas.width;
-        const wy = ((sy % canvas.height) + canvas.height) % canvas.height;
+        // Позиция с параллаксом (простая формула без обёртки)
+        const sx = (s.x - camera.x * layer.speed) * zoom;
+        const sy = (s.y - camera.y * layer.speed) * zoom;
+
+        // Рисуем только если на экране
+        if (sx < -10 || sx > canvas.width+10 || sy < -10 || sy > canvas.height+10) continue;
+
         ctx.globalAlpha = Math.max(0.05, layer.alpha + Math.sin(animFrame*0.03+s.flicker)*0.15);
         ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(wx, wy, s.r, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI*2); ctx.fill();
       }
     }
     ctx.globalAlpha = 1;
@@ -1123,7 +1719,7 @@
     for (let i = comets.length-1; i >= 0; i--) {
       const c = comets[i];
       c.x += c.vx; c.y += c.vy;
-      const sx = c.x - camera.x, sy = c.y - camera.y;
+      const sx = (c.x - camera.x) * zoom, sy = (c.y - camera.y) * zoom;
       const tailX = sx - c.vx*c.tailLen, tailY = sy - c.vy*c.tailLen;
       const grad = ctx.createLinearGradient(sx, sy, tailX, tailY);
       grad.addColorStop(0, `hsla(${c.hue},80%,70%,.8)`);
@@ -1134,27 +1730,49 @@
       ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI*2); ctx.fill();
       bloomCtx.fillStyle = `hsla(${c.hue},90%,70%,.6)`;
       bloomCtx.beginPath(); bloomCtx.arc(sx, sy, 4, 0, Math.PI*2); bloomCtx.fill();
-      if (c.x < -200 || c.x > MAP_W+200 || c.y < -200 || c.y > MAP_H+200) comets[i] = spawnComet();
+      if (c.x < -1000 || c.x > MAP_W+1000 || c.y < -1000 || c.y > MAP_H+1000) comets[i] = spawnComet();
     }
     if (Math.random() < 0.002 && comets.length < 5) comets.push(spawnComet());
   }
 
   function drawGrid() {
     ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
-    const gs = 200, offX = -camera.x%gs, offY = -camera.y%gs;
-    for (let gx = offX; gx < canvas.width; gx += gs) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,canvas.height); ctx.stroke(); }
-    for (let gy = offY; gy < canvas.height; gy += gs) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(canvas.width,gy); ctx.stroke(); }
+    const gs = 200;
+    const wLeft = camera.x, wRight = camera.x + canvas.width/zoom, wTop = camera.y, wBottom = camera.y + canvas.height/zoom;
+    for (let wx = Math.floor(wLeft/gs)*gs; wx <= wRight+gs; wx += gs) {
+      const sx = (wx - camera.x) * zoom;
+      ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,canvas.height); ctx.stroke();
+    }
+    for (let wy = Math.floor(wTop/gs)*gs; wy <= wBottom+gs; wy += gs) {
+      const sy = (wy - camera.y) * zoom;
+      ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(canvas.width,sy); ctx.stroke();
+    }
   }
 
   function drawAsteroids() {
+    const now = Date.now();
+    minerTargetEffects = minerTargetEffects.filter(e => now - e.startTime < 2500);
     for (const a of asteroidsArr) {
-      const sx = a.x-camera.x, sy = a.y-camera.y;
+      const sx = (a.x-camera.x)*zoom, sy = (a.y-camera.y)*zoom;
       if (sx < -30 || sx > canvas.width+30 || sy < -30 || sy > canvas.height+30) continue;
+      const effect = minerTargetEffects.find(e => e.asteroidId === a.id);
+      const effectAge = effect ? (now - effect.startTime) / 1000 : 999;
       ctx.fillStyle = '#8d6e63'; ctx.shadowColor = '#ff8f00'; ctx.shadowBlur = 6;
       ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = '#a1887f';
       ctx.beginPath(); ctx.arc(sx-3, sy-2, 6, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
+      if (effect && effectAge < 2.2) {
+        const pulse = 1 + Math.sin(effectAge * 12) * 0.3;
+        const r = (14 + effectAge * 8) * pulse * zoom;
+        const alpha = Math.max(0, 0.5 - effectAge * 0.25);
+        ctx.strokeStyle = `rgba(253,216,53,${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.stroke();
+        bloomCtx.strokeStyle = `rgba(255,193,7,${alpha*0.6})`;
+        bloomCtx.lineWidth = 3;
+        bloomCtx.beginPath(); bloomCtx.arc(sx, sy, r, 0, Math.PI*2); bloomCtx.stroke();
+      }
       ctx.fillStyle = '#fdd835'; ctx.font = '9px Segoe UI'; ctx.textAlign = 'center';
       ctx.fillText(`${a.res}`, sx, sy-14);
       bloomCtx.fillStyle = 'rgba(255,143,0,.3)';
@@ -1164,16 +1782,21 @@
 
   function drawMissions() {
     for (const m of missionsArr) {
-      const sx = m.x-camera.x, sy = m.y-camera.y;
-      const stx = m.tx-camera.x, sty = m.ty-camera.y;
+      const sx = (m.x-camera.x)*zoom, sy = (m.y-camera.y)*zoom;
+      const stx = (m.tx-camera.x)*zoom, sty = (m.ty-camera.y)*zoom;
       if (m.type === 'attack') {
         ctx.setLineDash([4,6]); ctx.strokeStyle = 'rgba(255,82,82,.2)'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(stx,sty); ctx.stroke(); ctx.setLineDash([]);
         const angle = Math.atan2(m.ty-m.y, m.tx-m.x);
-        for (let fi = 0; fi < 3; fi++) {
-          const spread = (fi-1)*5;
-          const fx = sx + Math.cos(angle+Math.PI/2)*spread;
-          const fy = sy + Math.sin(angle+Math.PI/2)*spread;
+        // Количество визуальных точек зависит от размера флота
+        const dotCount = Math.min(Math.max(3, Math.ceil(m.fleetCount / 5)), 12);
+        for (let fi = 0; fi < dotCount; fi++) {
+          const row = Math.floor(fi / 4);
+          const col = fi % 4;
+          const spread = (col - (Math.min(dotCount, 4) - 1) / 2) * 5;
+          const rowOffset = row * 6;
+          const fx = sx + Math.cos(angle+Math.PI/2)*spread - Math.cos(angle)*rowOffset;
+          const fy = sy + Math.sin(angle+Math.PI/2)*spread - Math.sin(angle)*rowOffset;
           ctx.fillStyle = '#ff5252';
           ctx.beginPath(); ctx.arc(fx, fy, 3, 0, Math.PI*2); ctx.fill();
         }
@@ -1184,8 +1807,19 @@
         ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tailX,tailY); ctx.stroke();
         bloomCtx.fillStyle = 'rgba(255,82,82,.5)';
         bloomCtx.beginPath(); bloomCtx.arc(sx,sy,8,0,Math.PI*2); bloomCtx.fill();
+        // Имя отправителя и количество кораблей
         ctx.fillStyle = '#ff8a80'; ctx.font = '9px Segoe UI'; ctx.textAlign = 'center';
-        ctx.fillText(m.owner, sx, sy-10);
+        ctx.fillText(m.owner, sx, sy-18);
+        // Бейдж с количеством кораблей
+        const shipLabel = `${m.fleetCount || '?'}`;
+        const tw = ctx.measureText(shipLabel).width;
+        const bx = sx - tw/2 - 4, by = sy - 14;
+        ctx.fillStyle = 'rgba(255,82,82,.7)';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + 8, 13, 3);
+        ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI';
+        ctx.fillText(shipLabel, sx, sy - 4);
       } else {
         const angle = Math.atan2(m.ty-m.y, m.tx-m.x);
         ctx.fillStyle = m.type === 'return' ? '#66bb6a' : '#fdd835';
@@ -1205,8 +1839,8 @@
   }
 
   function drawPlanet(p) {
-    const sx = p.x-camera.x, sy = p.y-camera.y;
-    const r = planetRadius(p.lvl);
+    const sx = (p.x-camera.x)*zoom, sy = (p.y-camera.y)*zoom;
+    const r = planetRadius(p.lvl) * zoom;
     if (sx < -r*4 || sx > canvas.width+r*4 || sy < -r*4 || sy > canvas.height+r*4) return;
     const isMe = p.nick === myNick;
     const pulse = 1 + Math.sin(animFrame*0.04+p.x)*0.02;
@@ -1238,8 +1872,20 @@
       ctx.beginPath(); ctx.arc(sx,sy,pr+8,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     }
 
+    // Защита новичка — зелёный пульсирующий круг
+    if (isProtectedClient(p)) {
+      const pa = .3 + Math.sin(animFrame * .06) * .15;
+      ctx.strokeStyle = `rgba(102,187,106,${pa})`; ctx.lineWidth = 2.5; ctx.setLineDash([8,4]);
+      ctx.beginPath(); ctx.arc(sx,sy,pr+14,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    }
+
     if (selecting && !isMe) {
-      ctx.strokeStyle = 'rgba(255,82,82,.5)'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+      if (isProtectedClient(p)) {
+        // Защищённая планета — серый круг вместо красного
+        ctx.strokeStyle = 'rgba(150,150,150,.3)'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+      } else {
+        ctx.strokeStyle = 'rgba(255,82,82,.5)'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+      }
       ctx.beginPath(); ctx.arc(sx,sy,pr+12,animFrame*.05,animFrame*.05+Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     }
 
@@ -1271,6 +1917,14 @@
     ctx.fillStyle = isMe ? '#b388ff' : (p.online ? '#ccc' : '#555');
     ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center';
     ctx.fillText(p.nick, sx, sy-pr-12);
+    if (p.allianceName) {
+      ctx.fillStyle = 'rgba(179,136,255,.7)'; ctx.font = '9px Segoe UI';
+      ctx.fillText(`[${p.allianceName}]`, sx, sy-pr+2);
+    }
+    if (isProtectedClient(p)) {
+      ctx.fillStyle = 'rgba(102,187,106,.8)'; ctx.font = '9px Segoe UI';
+      ctx.fillText(t('protectedLabel'), sx, sy-pr-24);
+    }
     ctx.fillStyle = '#888'; ctx.font = '10px Segoe UI';
     ctx.fillText(`ур.${p.lvl}  F:${p.fleet}  D:${p.defense}`, sx, sy+pr+18);
   }
@@ -1282,7 +1936,7 @@
         part.x += part.vx; part.y += part.vy;
         part.vx *= .98; part.vy *= .98; part.life -= .015;
         if (part.life <= 0) continue; allDead = false;
-        const sx = part.x-camera.x, sy = part.y-camera.y;
+        const sx = (part.x-camera.x)*zoom, sy = (part.y-camera.y)*zoom;
         ctx.globalAlpha = part.life; ctx.fillStyle = part.color;
         ctx.beginPath(); ctx.arc(sx,sy,3.5*part.life,0,Math.PI*2); ctx.fill();
         bloomCtx.globalAlpha = part.life*.6; bloomCtx.fillStyle = part.color;
@@ -1306,13 +1960,13 @@
       mmCtx.beginPath(); mmCtx.arc(p.x*sx, p.y*sy, isMe?3:2, 0, Math.PI*2); mmCtx.fill();
     }
     mmCtx.strokeStyle = 'rgba(124,77,255,.6)'; mmCtx.lineWidth = 1;
-    mmCtx.strokeRect(camera.x*sx, camera.y*sy, canvas.width*sx, canvas.height*sy);
+    mmCtx.strokeRect(camera.x*sx, camera.y*sy, (canvas.width/zoom)*sx, (canvas.height/zoom)*sy);
   }
 
   mmCanvas.addEventListener('click', (e) => {
     const rect = mmCanvas.getBoundingClientRect();
-    camera.x = ((e.clientX-rect.left)/mmCanvas.width)*MAP_W - canvas.width/2;
-    camera.y = ((e.clientY-rect.top)/mmCanvas.height)*MAP_H - canvas.height/2;
+    camera.x = ((e.clientX-rect.left)/mmCanvas.width)*MAP_W - canvas.width/(2*zoom);
+    camera.y = ((e.clientY-rect.top)/mmCanvas.height)*MAP_H - canvas.height/(2*zoom);
   });
 
   draw();
