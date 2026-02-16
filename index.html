@@ -1070,9 +1070,9 @@
   // ═══════════════════════════════════════════════════════
 
   const starLayers = [
-    { stars: [], speed: 0.3, count: 400, maxR: 1.0, alpha: 0.3 },
-    { stars: [], speed: 0.6, count: 300, maxR: 1.5, alpha: 0.5 },
-    { stars: [], speed: 1.0, count: 200, maxR: 2.0, alpha: 0.8 }
+    { stars: [], speed: 0.3, count: 600, maxR: 1.0, alpha: 0.3 },
+    { stars: [], speed: 0.6, count: 450, maxR: 1.5, alpha: 0.5 },
+    { stars: [], speed: 1.0, count: 300, maxR: 2.0, alpha: 0.8 }
   ];
   for (const layer of starLayers) {
     // Генерируем звёзды в огромной области (в 3 раза больше карты)
@@ -1084,6 +1084,40 @@
         flicker: Math.random() * Math.PI * 2
       });
     }
+  }
+
+  // Звёздные скопления (плеяды)
+  const starClusters = [];
+  for (let i = 0; i < 5; i++) {
+    const cx = Math.random() * MAP_VISUAL_MAX_W * 2;
+    const cy = Math.random() * MAP_VISUAL_MAX_H * 2;
+    const clusterSize = 8 + Math.random() * 12; // 8-20 звёзд
+    const stars = [];
+    for (let j = 0; j < clusterSize; j++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * 60 + 10;
+      stars.push({
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+        r: 0.8 + Math.random() * 1.2,
+        flicker: Math.random() * Math.PI * 2
+      });
+    }
+    starClusters.push({ stars, speed: 0.4 });
+  }
+
+  // Сверхновые (яркие пульсирующие звёзды)
+  const supernovas = [];
+  for (let i = 0; i < 4; i++) {
+    supernovas.push({
+      x: Math.random() * MAP_VISUAL_MAX_W * 2,
+      y: Math.random() * MAP_VISUAL_MAX_H * 2,
+      r: 3 + Math.random() * 2,
+      hue: Math.random() * 60 + (i % 2 === 0 ? 200 : 320), // Синие и розовые
+      speed: 0.5,
+      pulsePhase: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.02 + Math.random() * 0.01
+    });
   }
 
   const nebulae = [];
@@ -1670,6 +1704,8 @@
 
     drawNebulae();
     drawStars();
+    drawStarClusters();
+    drawSupernovas();
     drawComets();
     drawGrid();
     drawAsteroids();
@@ -1713,6 +1749,77 @@
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  function drawStarClusters() {
+    for (const cluster of starClusters) {
+      for (const s of cluster.stars) {
+        const sx = (s.x - camera.x * cluster.speed) * zoom;
+        const sy = (s.y - camera.y * cluster.speed) * zoom;
+
+        if (sx < -10 || sx > canvas.width+10 || sy < -10 || sy > canvas.height+10) continue;
+
+        // Голубоватый оттенок для скоплений
+        const flicker = Math.sin(animFrame*0.04+s.flicker)*0.2;
+        ctx.globalAlpha = 0.7 + flicker;
+        ctx.fillStyle = '#d4e8ff';
+        ctx.shadowColor = '#a0c8ff';
+        ctx.shadowBlur = 3;
+        ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Bloom для скоплений
+        bloomCtx.globalAlpha = 0.3;
+        bloomCtx.fillStyle = '#a0c8ff';
+        bloomCtx.beginPath(); bloomCtx.arc(sx, sy, s.r*2, 0, Math.PI*2); bloomCtx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    bloomCtx.globalAlpha = 1;
+  }
+
+  function drawSupernovas() {
+    for (const sn of supernovas) {
+      const sx = (sn.x - camera.x * sn.speed) * zoom;
+      const sy = (sn.y - camera.y * sn.speed) * zoom;
+
+      if (sx < -50 || sx > canvas.width+50 || sy < -50 || sy > canvas.height+50) continue;
+
+      // Пульсация сверхновой
+      sn.pulsePhase += sn.pulseSpeed;
+      const pulse = 0.7 + Math.sin(sn.pulsePhase) * 0.3;
+      const r = sn.r * pulse * zoom;
+
+      // Внутренняя яркая звезда
+      const innerGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+      innerGrad.addColorStop(0, `hsla(${sn.hue}, 100%, 95%, ${pulse})`);
+      innerGrad.addColorStop(0.3, `hsla(${sn.hue}, 90%, 80%, ${pulse*0.8})`);
+      innerGrad.addColorStop(1, `hsla(${sn.hue}, 70%, 60%, 0)`);
+      ctx.fillStyle = innerGrad;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill();
+
+      // Сияние (bloom)
+      const outerGrad = bloomCtx.createRadialGradient(sx, sy, 0, sx, sy, r*3);
+      outerGrad.addColorStop(0, `hsla(${sn.hue}, 100%, 70%, ${pulse*0.6})`);
+      outerGrad.addColorStop(0.5, `hsla(${sn.hue}, 80%, 50%, ${pulse*0.3})`);
+      outerGrad.addColorStop(1, `hsla(${sn.hue}, 60%, 40%, 0)`);
+      bloomCtx.fillStyle = outerGrad;
+      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, r*3, 0, Math.PI*2); bloomCtx.fill();
+
+      // Лучи от сверхновой
+      for (let i = 0; i < 4; i++) {
+        const angle = sn.pulsePhase * 0.5 + (i * Math.PI / 2);
+        const rayLen = r * (2 + Math.sin(sn.pulsePhase*2 + i) * 0.5);
+        const endX = sx + Math.cos(angle) * rayLen;
+        const endY = sy + Math.sin(angle) * rayLen;
+        const rayGrad = ctx.createLinearGradient(sx, sy, endX, endY);
+        rayGrad.addColorStop(0, `hsla(${sn.hue}, 100%, 90%, ${pulse*0.4})`);
+        rayGrad.addColorStop(1, `hsla(${sn.hue}, 80%, 70%, 0)`);
+        ctx.strokeStyle = rayGrad;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(endX, endY); ctx.stroke();
+      }
+    }
   }
 
   function drawComets() {
