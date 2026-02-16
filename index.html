@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Планетарный Хаос 2D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #ddd;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ═══ Общие экраны-оверлеи ════════════════════ */
+  .overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #111133 0%, #0a0a1a 70%);
+    z-index: 100;
+  }
+  .overlay h1 {
+    font-size: 48px; margin-bottom: 6px;
+    background: linear-gradient(90deg, #ff6fd8, #3813c2);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .overlay .sub { color: #888; margin-bottom: 20px; font-size: 14px; }
+  .overlay input[type=text] {
+    width: 280px; padding: 12px 16px;
+    border: 2px solid #333; border-radius: 8px;
+    background: #151528; color: #fff;
+    font-size: 18px; text-align: center;
+    outline: none; transition: border-color .2s;
+  }
+  .overlay input[type=text]:focus { border-color: #7c4dff; }
+  .overlay .big-btn {
+    margin-top: 12px; padding: 10px 40px;
+    border: none; border-radius: 8px;
+    background: linear-gradient(135deg, #7c4dff, #448aff);
+    color: #fff; font-size: 16px; cursor: pointer;
+    transition: opacity .2s;
+  }
+  .overlay .big-btn:hover { opacity: .85; }
+  .overlay .error { margin-top: 8px; color: #ff5252; font-size: 13px; min-height: 18px; }
+
+  /* ═══ Экран поражения ═════════════════════════ */
+  #death-screen { display: none; }
+  #death-screen h1 {
+    background: linear-gradient(90deg, #ff1744, #ff6d00);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .death-stats {
+    margin: 12px 0 20px;
+    padding: 14px 24px;
+    background: rgba(255,23,68,.08);
+    border: 1px solid rgba(255,23,68,.2);
+    border-radius: 8px;
+    font-size: 14px; line-height: 1.8;
+    text-align: center;
+  }
+  .death-stats .killer { color: #ff5252; font-weight: bold; font-size: 16px; }
+  .death-stats .stat-line { color: #aaa; }
+  .death-stats .stat-line b { color: #fff; }
+
+  /* ═══ Canvas ══════════════════════════════════ */
+  #game-screen { display: none; }
+  #canvas-main { display: block; cursor: crosshair; position: relative; z-index: 1; }
+  #canvas-bloom {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+    filter: blur(16px) brightness(1.5);
+    mix-blend-mode: screen;
+    opacity: 0.35;
+  }
+
+  /* ═══ HUD ═════════════════════════════════════ */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 0;
+    padding: 0 8px;
+    background: rgba(10,10,26,.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #222;
+    z-index: 10; font-size: 13px;
+    height: 38px;
+  }
+  #hud .nick-label {
+    font-weight: bold; color: #7c4dff; font-size: 14px;
+    padding: 0 12px 0 4px;
+    border-right: 1px solid #333;
+    margin-right: 4px;
+  }
+  .hud-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px;
+    border-right: 1px solid rgba(255,255,255,.06);
+    cursor: default;
+    position: relative;
+  }
+  .hud-item:last-child { border-right: none; }
+  .hud-icon { font-size: 14px; opacity: .7; }
+  .hud-val { color: #fff; font-weight: bold; font-size: 13px; }
+  .hud-item .hud-label { color: #777; font-size: 10px; margin-left: 2px; }
+
+  /* Тултипы при наведении */
+  .hud-item .tooltip {
+    display: none;
+    position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 10px; margin-top: 6px;
+    background: rgba(20,20,40,.95);
+    border: 1px solid #444; border-radius: 6px;
+    font-size: 11px; color: #ccc;
+    white-space: nowrap; z-index: 30;
+    pointer-events: none;
+  }
+  .hud-item:hover .tooltip { display: block; }
+
+  .hud-cd {
+    color: #ff5252; font-weight: bold; font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  /* ═══ Панель улучшений (слева) ════════════════ */
+  #upgrade-panel {
+    position: fixed; left: 10px; top: 50%;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 5px;
+    z-index: 10; width: 170px;
+  }
+  .upg-section-title {
+    font-size: 9px; color: #666; text-transform: uppercase;
+    letter-spacing: 1px; padding: 4px 0 0 4px;
+  }
+  .upg-btn {
+    padding: 7px 10px;
+    border: 1px solid #2a2a3a; border-radius: 6px;
+    background: rgba(18,18,36,.94);
+    color: #bbb; font-size: 11px;
+    cursor: pointer; transition: all .15s;
+    text-align: left;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .upg-btn:hover { background: #1e1e3e; border-color: #555; color: #fff; }
+  .upg-btn:active { transform: scale(.97); }
+  .upg-top { display: flex; align-items: center; gap: 6px; }
+  .upg-icon { font-size: 15px; }
+  .upg-name { font-weight: bold; font-size: 12px; }
+  .upg-desc { font-size: 9px; color: #666; line-height: 1.3; }
+  .upg-cost { font-size: 10px; color: #fdd835; margin-top: 1px; }
+  .upg-btn.eco .upg-name { color: #66bb6a; }
+  .upg-btn.mil .upg-name { color: #ef5350; }
+  .upg-btn.fort .upg-name { color: #4dd0e1; }
+  .upg-sep { border: none; border-top: 1px solid #222; margin: 2px 0; }
+
+  /* ═══ Кнопки внизу ════════════════════════════ */
+  #actions {
+    position: fixed; bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 10;
+  }
+  .action-btn {
+    padding: 7px 14px;
+    border: 1px solid #333; border-radius: 6px;
+    background: rgba(20,20,40,.92);
+    color: #ccc; font-size: 12px;
+    cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .action-btn:hover { background: #222; border-color: #7c4dff; color: #fff; }
+  .action-btn .key {
+    background: #333; padding: 1px 5px; border-radius: 3px;
+    font-size: 10px; color: #888;
+  }
+  .action-btn.danger { border-color: #5a2020; }
+  .action-btn.danger:hover { background: #3a1111; color: #ff5252; border-color: #ff5252; }
+
+  /* ═══ Чат ═════════════════════════════════════ */
+  #chat-box {
+    position: fixed; bottom: 50px; left: 10px;
+    width: 300px; max-height: 140px;
+    overflow-y: auto; z-index: 10;
+    font-size: 11px; color: #aaa;
+    pointer-events: none;
+  }
+  #chat-box div { margin-bottom: 2px; opacity: .8; }
+  #chat-box .from { color: #7c4dff; font-weight: bold; }
+
+  /* ═══ Мини-карта ══════════════════════════════ */
+  #minimap {
+    position: fixed; right: 10px; bottom: 10px;
+    width: 200px; height: 150px;
+    border: 1px solid #333; border-radius: 6px;
+    background: rgba(10,10,26,.85);
+    z-index: 10;
+  }
+
+  /* ═══ Подсказки ═══════════════════════════════ */
+  #attack-hint {
+    position: fixed; top: 46px; left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 18px; border-radius: 6px;
+    background: rgba(255,82,82,.88);
+    color: #fff; font-size: 12px;
+    display: none; z-index: 20;
+    animation: hintPulse 2s infinite;
+  }
+  @keyframes hintPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,82,82,.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255,82,82,0); }
+  }
+  #info-toast {
+    position: fixed; top: 46px; left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 18px; border-radius: 6px;
+    background: rgba(33,150,243,.88);
+    color: #fff; font-size: 12px;
+    display: none; z-index: 20;
+  }
+
+  /* ═══ Предупреждение о входящей атаке ═════════ */
+  #incoming-warning {
+    position: fixed; inset: 0;
+    border: 4px solid transparent;
+    pointer-events: none; z-index: 15;
+  }
+  #incoming-warning.active { animation: warningPulse 1s infinite; }
+  @keyframes warningPulse {
+    0%,100% { border-color: rgba(255,30,30,0); }
+    50% { border-color: rgba(255,30,30,.5); }
+  }
+
+  /* ═══ Диалог отправки флота ═══════════════════ */
+  #fleet-dialog {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    padding: 22px 30px; border-radius: 12px;
+    background: rgba(15,15,35,.97);
+    border: 1px solid #444;
+    z-index: 50; display: none;
+    text-align: center; min-width: 260px;
+  }
+  #fleet-dialog h3 { color: #ef5350; margin-bottom: 4px; font-size: 15px; }
+  #fleet-dialog .target-name { color: #fff; font-size: 14px; margin-bottom: 12px; }
+  #fleet-dialog input {
+    width: 140px; padding: 8px 10px;
+    border: 1px solid #555; border-radius: 6px;
+    background: #1a1a2e; color: #fff;
+    font-size: 18px; text-align: center; outline: none;
+  }
+  #fleet-dialog .avail { font-size: 11px; color: #888; margin-top: 4px; }
+  #fleet-dialog .btns { margin-top: 14px; display: flex; gap: 8px; justify-content: center; }
+  #fleet-dialog button {
+    padding: 7px 18px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 13px; transition: opacity .15s;
+  }
+  #fleet-dialog button:hover { opacity: .85; }
+  #fleet-dialog .send { background: #ef5350; color: #fff; }
+  #fleet-dialog .cancel { background: #333; color: #aaa; }
+
+  /* ═══ Подсказка для новичка ════════════════════ */
+  #onboarding {
+    position: fixed; bottom: 50px; right: 220px;
+    width: 220px; padding: 12px 14px;
+    background: rgba(15,15,35,.94);
+    border: 1px solid #333; border-radius: 8px;
+    font-size: 11px; color: #aaa; line-height: 1.5;
+    z-index: 10; display: none;
+  }
+  #onboarding .title { color: #7c4dff; font-weight: bold; font-size: 12px; margin-bottom: 4px; }
+  #onboarding .close-tip {
+    position: absolute; top: 4px; right: 8px;
+    cursor: pointer; color: #666; font-size: 14px;
+  }
+
+  /* ═══ Переключатель языка ═══════════════════ */
+  #lang-toggle {
+    position: fixed; top: 8px; right: 10px;
+    z-index: 200;
+    display: flex; align-items: center;
+    background: rgba(18,18,36,.92);
+    border: 1px solid #333; border-radius: 6px;
+    overflow: hidden; cursor: pointer;
+    font-size: 12px; font-weight: bold;
+  }
+  #lang-toggle .lang-opt {
+    padding: 5px 10px;
+    color: #666; transition: all .15s;
+  }
+  #lang-toggle .lang-opt.active {
+    background: rgba(124,77,255,.25);
+    color: #b388ff;
+  }
+  #lang-toggle .lang-opt:hover:not(.active) { color: #aaa; }
+</style>
+</head>
+<body>
+
+<!-- ═══ Переключатель языка ═══ -->
+<div id="lang-toggle">
+  <span class="lang-opt active" data-lang="ru">RU</span>
+  <span class="lang-opt" data-lang="en">EN</span>
+</div>
+
+<!-- ═══ Экран входа ═══ -->
+<div class="overlay" id="login-screen">
+  <h1 id="login-title">Планетарный Хаос</h1>
+  <p class="sub" id="login-sub">Многопользовательская космическая стратегия</p>
+  <input id="nick-input" type="text" placeholder="Ваш никнейм" maxlength="16" autofocus>
+  <button class="big-btn" id="join-btn">Начать игру</button>
+  <div class="error" id="login-error"></div>
+</div>
+
+<!-- ═══ Экран поражения / респавна ═══ -->
+<div class="overlay" id="death-screen">
+  <h1 id="death-title">Планета уничтожена</h1>
+  <div class="death-stats">
+    <div class="killer" id="death-killer"></div>
+    <div class="stat-line"><span id="death-res-label">Потеряно ресурсов:</span> <b id="death-res">0</b></div>
+    <div class="stat-line"><span id="death-lvl-label">Уровень планеты:</span> <b id="death-lvl">0</b></div>
+    <div class="stat-line"><span id="death-fleet-label">Флот:</span> <b id="death-fleet">0</b></div>
+  </div>
+  <input id="respawn-nick" type="text" placeholder="Ваш никнейм" maxlength="16">
+  <button class="big-btn" id="respawn-btn">Возродиться</button>
+  <div class="error" id="respawn-error"></div>
+</div>
+
+<!-- ═══ Игровой экран ═══ -->
+<div id="game-screen">
+  <canvas id="canvas-bloom"></canvas>
+  <canvas id="canvas-main"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="nick-label" id="hud-nick"></div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9733;</span>
+      <span class="hud-val" id="hud-lvl">1</span>
+      <span class="hud-label" id="lbl-lvl">ур.</span>
+      <div class="tooltip" id="tip-lvl">Уровень экономики. Чем выше, тем больше доход ресурсов</div>
+    </div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9670;</span>
+      <span class="hud-val" id="hud-res">0</span>
+      <span class="hud-label" id="lbl-res">рес.</span>
+      <div class="tooltip" id="tip-res">Ресурсы. Тратятся на улучшения, флот и защиту</div>
+    </div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9992;</span>
+      <span class="hud-val" id="hud-fleet">0</span>
+      <span class="hud-label" id="lbl-fleet">флот</span>
+      <div class="tooltip" id="tip-fleet">Корабли для атаки и добычи астероидов</div>
+    </div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9711;</span>
+      <span class="hud-val" id="hud-def">0</span>
+      <span class="hud-label" id="lbl-def">щит</span>
+      <div class="tooltip" id="tip-def">Защита планеты. Помогает выстоять при атаке</div>
+    </div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9876;</span>
+      <span class="hud-val" id="hud-mil">0</span>
+      <span class="hud-label" id="lbl-mil">воен.</span>
+      <div class="tooltip" id="tip-mil">Военный уровень: +5% силы атаки, +10% скорости флота</div>
+    </div>
+
+    <div class="hud-item">
+      <span class="hud-icon">&#9730;</span>
+      <span class="hud-val" id="hud-fort">0</span>
+      <span class="hud-label" id="lbl-fort">форт</span>
+      <div class="tooltip" id="tip-fort">Фортификация: увеличивает макс. щит и его восстановление</div>
+    </div>
+
+    <div class="hud-cd" id="hud-cd" style="display:none">
+      &#9201; <span id="hud-cd-val">0</span><span id="hud-cd-unit">с</span>
+    </div>
+  </div>
+
+  <!-- Панель улучшений -->
+  <div id="upgrade-panel">
+    <div class="upg-section-title" id="upg-title">Улучшения</div>
+
+    <button class="upg-btn eco" id="btn-upg-eco">
+      <div class="upg-top"><span class="upg-icon">&#9733;</span><span class="upg-name" id="upg-eco-name">Экономика</span></div>
+      <div class="upg-desc" id="upg-eco-desc">+8 рес/сек за уровень</div>
+      <div class="upg-cost" id="cost-eco"></div>
+    </button>
+
+    <button class="upg-btn mil" id="btn-upg-mil">
+      <div class="upg-top"><span class="upg-icon">&#9876;</span><span class="upg-name" id="upg-mil-name">Военное дело</span></div>
+      <div class="upg-desc" id="upg-mil-desc">+5% сила, +10% скорость</div>
+      <div class="upg-cost" id="cost-mil"></div>
+    </button>
+
+    <button class="upg-btn fort" id="btn-upg-fort">
+      <div class="upg-top"><span class="upg-icon">&#9730;</span><span class="upg-name" id="upg-fort-name">Укрепление</span></div>
+      <div class="upg-desc" id="upg-fort-desc">+10 макс. щит, +0.5 реген</div>
+      <div class="upg-cost" id="cost-fort"></div>
+    </button>
+
+    <hr class="upg-sep">
+    <div class="upg-section-title" id="buy-title">Покупка</div>
+
+    <button class="upg-btn" id="btn-fleet1">
+      <div class="upg-top"><span class="upg-icon">&#9992;</span><span id="buy-f1">+1 корабль</span></div>
+      <div class="upg-cost" id="buy-f1-cost">10 рес.</div>
+    </button>
+    <button class="upg-btn" id="btn-fleet10">
+      <div class="upg-top"><span class="upg-icon">&#9992;</span><span id="buy-f10">+10 кораблей</span></div>
+      <div class="upg-cost" id="buy-f10-cost">100 рес.</div>
+    </button>
+    <button class="upg-btn" id="btn-def5">
+      <div class="upg-top"><span class="upg-icon">&#9711;</span><span id="buy-d5">+5 щит</span></div>
+      <div class="upg-cost" id="buy-d5-cost">75 рес.</div>
+    </button>
+  </div>
+
+  <!-- Действия -->
+  <div id="actions">
+    <button class="action-btn" id="btn-center"><span class="key">Space</span> <span id="act-center">Моя планета</span></button>
+    <button class="action-btn" id="btn-attack-mode"><span class="key">Click</span> <span id="act-attack">Режим атаки</span></button>
+    <button class="action-btn danger" id="btn-destruct"><span id="act-destruct">Самоуничтожение</span></button>
+  </div>
+
+  <div id="chat-box"></div>
+  <canvas id="minimap" width="200" height="150"></canvas>
+  <div id="attack-hint">&#9876; Кликните по чужой планете, чтобы отправить флот</div>
+  <div id="info-toast"></div>
+  <div id="incoming-warning"></div>
+
+  <!-- Подсказка для новичка -->
+  <div id="onboarding">
+    <span class="close-tip" id="close-onboarding">&#10005;</span>
+    <div class="title" id="onb-title">Как играть</div>
+    <span id="onb-tips">&#9733; Улучшай экономику, чтобы быстрее копить ресурсы<br>
+    &#9992; Строй корабли для атак и добычи<br>
+    &#9670; Кликай по астероидам, чтобы отправить добытчика<br>
+    &#9876; Кликни свою планету, затем чужую — атака!<br>
+    &#9711; Покупай щит для защиты от врагов<br>
+    &#9730; Качай укрепление для авто-восстановления щита</span>
+  </div>
+
+  <!-- Диалог отправки флота -->
+  <div id="fleet-dialog">
+    <h3 id="fd-title">&#9876; Атаковать</h3>
+    <div class="target-name" id="fleet-dialog-target"></div>
+    <input id="fleet-count-input" type="number" min="1" placeholder="Кол-во кораблей">
+    <div class="avail"><span id="fd-avail-label">Доступно:</span> <span id="fleet-avail">0</span> <span id="fd-ships-label">кораблей</span></div>
+    <div class="btns">
+      <button class="send" id="fleet-send-btn"><span id="fd-send">Отправить</span></button>
+      <button class="send" id="fleet-all-btn"><span id="fd-all">Весь флот</span></button>
+      <button class="cancel" id="fleet-cancel-btn"><span id="fd-cancel">Отмена</span></button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// Клиент — Планетарный Хаос 2D v0.6
+// ═══════════════════════════════════════════════════════════
+(() => {
+  'use strict';
+
+  // ── DOM ─────────────────────────────────────────────────
+  const loginScreen   = document.getElementById('login-screen');
+  const deathScreen   = document.getElementById('death-screen');
+  const gameScreen    = document.getElementById('game-screen');
+  const nickInput     = document.getElementById('nick-input');
+  const joinBtn       = document.getElementById('join-btn');
+  const loginError    = document.getElementById('login-error');
+
+  const respawnNick   = document.getElementById('respawn-nick');
+  const respawnBtn    = document.getElementById('respawn-btn');
+  const respawnError  = document.getElementById('respawn-error');
+
+  const canvas   = document.getElementById('canvas-main');
+  const ctx      = canvas.getContext('2d');
+  const bloomC   = document.getElementById('canvas-bloom');
+  const bloomCtx = bloomC.getContext('2d');
+  const mmCanvas = document.getElementById('minimap');
+  const mmCtx    = mmCanvas.getContext('2d');
+
+  const hudNick  = document.getElementById('hud-nick');
+  const hudLvl   = document.getElementById('hud-lvl');
+  const hudRes   = document.getElementById('hud-res');
+  const hudFleet = document.getElementById('hud-fleet');
+  const hudDef   = document.getElementById('hud-def');
+  const hudMil   = document.getElementById('hud-mil');
+  const hudFort  = document.getElementById('hud-fort');
+  const hudCd    = document.getElementById('hud-cd');
+  const hudCdVal = document.getElementById('hud-cd-val');
+  const chatBox  = document.getElementById('chat-box');
+  const attackHint  = document.getElementById('attack-hint');
+  const infoToast   = document.getElementById('info-toast');
+  const incomingWarn = document.getElementById('incoming-warning');
+  const onboarding  = document.getElementById('onboarding');
+
+  const fleetDialog     = document.getElementById('fleet-dialog');
+  const fleetDialogTarget = document.getElementById('fleet-dialog-target');
+  const fleetCountInput = document.getElementById('fleet-count-input');
+  const fleetAvailSpan  = document.getElementById('fleet-avail');
+
+  // ── Локализация (RU/EN) ─────────────────────────────────
+  const L10N = {
+    ru: {
+      pageTitle: 'Планетарный Хаос 2D',
+      loginTitle: 'Планетарный Хаос',
+      loginSub: 'Многопользовательская космическая стратегия',
+      nickPlaceholder: 'Ваш никнейм',
+      joinBtn: 'Начать игру',
+      deathTitle: 'Планета уничтожена',
+      deathResLabel: 'Потеряно ресурсов:',
+      deathLvlLabel: 'Уровень планеты:',
+      deathFleetLabel: 'Флот:',
+      deathKillerBy: 'Уничтожен игроком {0}',
+      respawnPlaceholder: 'Ваш никнейм',
+      respawnBtn: 'Возродиться',
+      lblLvl: 'ур.', lblRes: 'рес.', lblFleet: 'флот', lblDef: 'щит', lblMil: 'воен.', lblFort: 'форт',
+      tipLvl: 'Уровень экономики. Чем выше, тем больше доход ресурсов',
+      tipRes: 'Ресурсы. Тратятся на улучшения, флот и защиту',
+      tipFleet: 'Корабли для атаки и добычи астероидов',
+      tipDef: 'Защита планеты. Помогает выстоять при атаке',
+      tipMil: 'Военный уровень: +5% силы атаки, +10% скорости флота',
+      tipFort: 'Фортификация: увеличивает макс. щит и его восстановление',
+      resShort: 'рес.',
+      cdUnit: 'с',
+      upgTitle: 'Улучшения', buyTitle: 'Покупка',
+      upgEcoName: 'Экономика', upgEcoDesc: '+8 рес/сек за уровень',
+      upgMilName: 'Военное дело', upgMilDesc: '+5% сила, +10% скорость',
+      upgFortName: 'Укрепление', upgFortDesc: '+10 макс. щит, +0.5 реген',
+      buyF1: '+1 корабль', buyF1Cost: '10 рес.', buyF10: '+10 кораблей', buyF10Cost: '100 рес.',
+      buyD5: '+5 щит', buyD5Cost: '75 рес.',
+      actCenter: 'Моя планета', actAttack: 'Режим атаки', actDestruct: 'Самоуничтожение',
+      attackHint: 'Кликните по чужой планете, чтобы отправить флот',
+      onbTitle: 'Как играть',
+      onbTips: '★ Улучшай экономику, чтобы быстрее копить ресурсы<br>✈ Строй корабли для атак и добычи<br>◆ Кликай по астероидам, чтобы отправить добытчика<br>⚔ Кликни свою планету, затем чужую — атака!<br>☂ Покупай щит для защиты от врагов<br>☀ Качай укрепление для авто-восстановления щита',
+      fdTitle: '⚔ Атаковать', fdAvailLabel: 'Доступно:', fdShipsLabel: 'кораблей',
+      fdSend: 'Отправить', fdAll: 'Весь флот', fdCancel: 'Отмена',
+      fleetCountPlaceholder: 'Кол-во кораблей',
+      confirmDestruct: 'Самоуничтожить планету? Все данные будут потеряны.',
+      fleetSentToast: 'Флот отправлен: {0} кораблей, прибытие ~{1}с',
+    },
+    en: {
+      pageTitle: 'Planetary Chaos 2D',
+      loginTitle: 'Planetary Chaos',
+      loginSub: 'Multiplayer space strategy',
+      nickPlaceholder: 'Your nickname',
+      joinBtn: 'Start game',
+      deathTitle: 'Planet destroyed',
+      deathResLabel: 'Resources lost:',
+      deathLvlLabel: 'Planet level:',
+      deathFleetLabel: 'Fleet:',
+      deathKillerBy: 'Destroyed by player {0}',
+      respawnPlaceholder: 'Your nickname',
+      respawnBtn: 'Respawn',
+      lblLvl: 'lvl', lblRes: 'res', lblFleet: 'fleet', lblDef: 'shield', lblMil: 'mil', lblFort: 'fort',
+      tipLvl: 'Economy level. Higher = more resource income',
+      tipRes: 'Resources. Spent on upgrades, fleet and defense',
+      tipFleet: 'Ships for attack and asteroid mining',
+      tipDef: 'Planet defense. Helps survive attacks',
+      tipMil: 'Military level: +5% attack, +10% fleet speed',
+      tipFort: 'Fortification: +max shield and regeneration',
+      resShort: 'res',
+      cdUnit: 's',
+      upgTitle: 'Upgrades', buyTitle: 'Purchase',
+      upgEcoName: 'Economy', upgEcoDesc: '+8 res/sec per level',
+      upgMilName: 'Military', upgMilDesc: '+5% power, +10% speed',
+      upgFortName: 'Fortification', upgFortDesc: '+10 max shield, +0.5 regen',
+      buyF1: '+1 ship', buyF1Cost: '10 res', buyF10: '+10 ships', buyF10Cost: '100 res',
+      buyD5: '+5 shield', buyD5Cost: '75 res',
+      actCenter: 'My planet', actAttack: 'Attack mode', actDestruct: 'Self-destruct',
+      attackHint: 'Click on an enemy planet to send fleet',
+      onbTitle: 'How to play',
+      onbTips: '★ Upgrade economy to earn resources faster<br>✈ Build ships for attacks and mining<br>◆ Click asteroids to send a miner<br>⚔ Click your planet, then enemy — attack!<br>☂ Buy shield to defend from enemies<br>☀ Upgrade fortification for shield regen',
+      fdTitle: '⚔ Attack', fdAvailLabel: 'Available:', fdShipsLabel: 'ships',
+      fdSend: 'Send', fdAll: 'All fleet', fdCancel: 'Cancel',
+      fleetCountPlaceholder: 'Ship count',
+      confirmDestruct: 'Self-destruct planet? All data will be lost.',
+      fleetSentToast: 'Fleet sent: {0} ships, ETA ~{1}s',
+    },
+  };
+
+  let currentLang = localStorage.getItem('planetLang') || 'ru';
+  function t(key, ...args) {
+    const s = (L10N[currentLang] && L10N[currentLang][key]) || L10N.ru[key] || key;
+    if (!args.length) return s;
+    return s.replace(/\{(\d+)\}/g, (_, i) => args[Number(i)] ?? '');
+  }
+
+  function applyLang(lang) {
+    if (!L10N[lang]) lang = 'ru';
+    currentLang = lang;
+    localStorage.setItem('planetLang', lang);
+    document.documentElement.lang = lang;
+
+    document.getElementById('lang-toggle').querySelectorAll('.lang-opt').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-lang') === lang);
+    });
+
+    const tr = L10N[lang];
+    document.title = tr.pageTitle;
+    document.getElementById('login-title').textContent = tr.loginTitle;
+    document.getElementById('login-sub').textContent = tr.loginSub;
+    nickInput.placeholder = tr.nickPlaceholder;
+    joinBtn.textContent = tr.joinBtn;
+
+    document.getElementById('death-title').textContent = tr.deathTitle;
+    document.getElementById('death-res-label').textContent = tr.deathResLabel;
+    document.getElementById('death-lvl-label').textContent = tr.deathLvlLabel;
+    document.getElementById('death-fleet-label').textContent = tr.deathFleetLabel;
+    respawnNick.placeholder = tr.respawnPlaceholder;
+    respawnBtn.textContent = tr.respawnBtn;
+
+    document.getElementById('lbl-lvl').textContent = tr.lblLvl;
+    document.getElementById('lbl-res').textContent = tr.lblRes;
+    document.getElementById('lbl-fleet').textContent = tr.lblFleet;
+    document.getElementById('lbl-def').textContent = tr.lblDef;
+    document.getElementById('lbl-mil').textContent = tr.lblMil;
+    document.getElementById('lbl-fort').textContent = tr.lblFort;
+    document.getElementById('tip-lvl').textContent = tr.tipLvl;
+    document.getElementById('tip-res').textContent = tr.tipRes;
+    document.getElementById('tip-fleet').textContent = tr.tipFleet;
+    document.getElementById('tip-def').textContent = tr.tipDef;
+    document.getElementById('tip-mil').textContent = tr.tipMil;
+    document.getElementById('tip-fort').textContent = tr.tipFort;
+    const hudCdUnit = document.getElementById('hud-cd-unit');
+    if (hudCdUnit) hudCdUnit.textContent = tr.cdUnit;
+
+    document.getElementById('upg-title').textContent = tr.upgTitle;
+    document.getElementById('buy-title').textContent = tr.buyTitle;
+    document.getElementById('upg-eco-name').textContent = tr.upgEcoName;
+    document.getElementById('upg-eco-desc').textContent = tr.upgEcoDesc;
+    document.getElementById('upg-mil-name').textContent = tr.upgMilName;
+    document.getElementById('upg-mil-desc').textContent = tr.upgMilDesc;
+    document.getElementById('upg-fort-name').textContent = tr.upgFortName;
+    document.getElementById('upg-fort-desc').textContent = tr.upgFortDesc;
+    document.getElementById('buy-f1').textContent = tr.buyF1;
+    document.getElementById('buy-f10').textContent = tr.buyF10;
+    document.getElementById('buy-f1-cost').textContent = tr.buyF1Cost;
+    document.getElementById('buy-f10-cost').textContent = tr.buyF10Cost;
+    document.getElementById('buy-d5').textContent = tr.buyD5;
+    document.getElementById('buy-d5-cost').textContent = tr.buyD5Cost;
+
+    document.getElementById('act-center').textContent = tr.actCenter;
+    document.getElementById('act-attack').textContent = tr.actAttack;
+    document.getElementById('act-destruct').textContent = tr.actDestruct;
+    attackHint.textContent = tr.attackHint;
+    document.getElementById('onb-title').textContent = tr.onbTitle;
+    document.getElementById('onb-tips').innerHTML = tr.onbTips;
+
+    document.getElementById('fd-title').textContent = tr.fdTitle;
+    document.getElementById('fd-avail-label').textContent = tr.fdAvailLabel;
+    document.getElementById('fd-ships-label').textContent = tr.fdShipsLabel;
+    document.getElementById('fd-send').textContent = tr.fdSend;
+    document.getElementById('fd-all').textContent = tr.fdAll;
+    document.getElementById('fd-cancel').textContent = tr.fdCancel;
+    fleetCountInput.placeholder = tr.fleetCountPlaceholder;
+  }
+
+  document.getElementById('lang-toggle').addEventListener('click', (e) => {
+    const opt = e.target.closest('.lang-opt');
+    if (opt) {
+      const lang = opt.getAttribute('data-lang');
+      if (lang) {
+        applyLang(lang);
+        if (myNick && playersArr.length && typeof updateHUD === 'function') updateHUD();
+      }
+    }
+  });
+  applyLang(currentLang);
+
+  // ── Состояние ───────────────────────────────────────────
+  let myNick = null;
+  let playersArr = [];
+  let missionsArr = [];
+  let asteroidsArr = [];
+  let camera = { x: 0, y: 0 };
+  let selecting = false;
+  let selectedTarget = null;
+  let animFrame = 0;
+  let explosions = [];
+  let comets = [];
+  let needCenterOnSelf = false;
+
+  const MAP_W = 4000;
+  const MAP_H = 3000;
+  const LVL_COST_BASE = 100;
+  const LVL_COST_MULT = 1.6;
+  const MIL_COST_BASE = 120;
+  const MIL_COST_MULT = 1.7;
+  const FORT_COST_BASE = 100;
+  const FORT_COST_MULT = 1.5;
+  const ATTACK_COOLDOWN = 30000;
+
+  const socket = io();
+
+  // ═══════════════════════════════════════════════════════
+  // ВИЗУАЛЬНЫЕ ДАННЫЕ
+  // ═══════════════════════════════════════════════════════
+
+  const starLayers = [
+    { stars: [], speed: 0.3, count: 200, maxR: 1.0, alpha: 0.3 },
+    { stars: [], speed: 0.6, count: 150, maxR: 1.5, alpha: 0.5 },
+    { stars: [], speed: 1.0, count: 100, maxR: 2.0, alpha: 0.8 }
+  ];
+  for (const layer of starLayers) {
+    for (let i = 0; i < layer.count; i++) {
+      layer.stars.push({
+        x: Math.random() * MAP_W * 1.5,
+        y: Math.random() * MAP_H * 1.5,
+        r: Math.random() * layer.maxR + 0.2,
+        flicker: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  const nebulae = [];
+  for (let i = 0; i < 6; i++) {
+    nebulae.push({
+      x: Math.random() * MAP_W,
+      y: Math.random() * MAP_H,
+      r: 200 + Math.random() * 400,
+      hue: Math.random() * 360,
+      alpha: 0.03 + Math.random() * 0.04
+    });
+  }
+
+  function spawnComet() {
+    const fromLeft = Math.random() > 0.5;
+    return {
+      x: fromLeft ? -50 : MAP_W + 50,
+      y: Math.random() * MAP_H,
+      vx: (fromLeft ? 1 : -1) * (1.5 + Math.random() * 2),
+      vy: (Math.random() - 0.5) * 0.8,
+      tailLen: 40 + Math.random() * 60,
+      hue: Math.random() * 60 + 180,
+      life: 1
+    };
+  }
+  for (let i = 0; i < 3; i++) comets.push(spawnComet());
+
+  function resize() {
+    canvas.width = bloomC.width = window.innerWidth;
+    canvas.height = bloomC.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ═══════════════════════════════════════════════════════
+  // ВХОД / РЕСПАВН
+  // ═══════════════════════════════════════════════════════
+
+  function showScreen(screen) {
+    loginScreen.style.display = 'none';
+    deathScreen.style.display = 'none';
+    gameScreen.style.display = 'none';
+    screen.style.display = screen === gameScreen ? 'block' : 'flex';
+  }
+
+  function tryJoin(nick, errorEl) {
+    socket.emit('join', nick, (resp) => {
+      if (!resp.ok) { errorEl.textContent = resp.msg; return; }
+      myNick = nick;
+      localStorage.setItem('planetNick', nick);
+      showScreen(gameScreen);
+      hudNick.textContent = nick;
+      needCenterOnSelf = true;
+      // Показать подсказку новичкам
+      if (!localStorage.getItem('onboardingSeen')) {
+        onboarding.style.display = 'block';
+      }
+    });
+  }
+
+  // Автовход
+  const savedNick = localStorage.getItem('planetNick');
+  if (savedNick) {
+    nickInput.value = savedNick;
+    socket.on('connect', () => tryJoin(savedNick, loginError));
+  } else {
+    socket.on('connect', () => {});
+  }
+
+  joinBtn.addEventListener('click', () => tryJoin(nickInput.value.trim(), loginError));
+  nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryJoin(nickInput.value.trim(), loginError); });
+
+  respawnBtn.addEventListener('click', () => tryJoin(respawnNick.value.trim(), respawnError));
+  respawnNick.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryJoin(respawnNick.value.trim(), respawnError); });
+
+  // Закрыть подсказку
+  document.getElementById('close-onboarding').addEventListener('click', () => {
+    onboarding.style.display = 'none';
+    localStorage.setItem('onboardingSeen', '1');
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // СОБЫТИЯ СЕРВЕРА
+  // ═══════════════════════════════════════════════════════
+
+  socket.on('state', (list) => {
+    playersArr = list;
+    updateHUD();
+    if (needCenterOnSelf) { centerOnSelf(); needCenterOnSelf = false; }
+  });
+
+  socket.on('missions', (list) => {
+    missionsArr = list;
+    checkIncoming();
+  });
+
+  socket.on('asteroids', (list) => { asteroidsArr = list; });
+  socket.on('upgraded', () => updateHUD());
+  socket.on('fleetBought', () => updateHUD());
+  socket.on('defenseBought', () => updateHUD());
+
+  socket.on('attackResult', (data) => {
+    selecting = false;
+    attackHint.style.display = 'none';
+    if (!data.ok) {
+      showToast(data.msg);
+    } else if (data.launched) {
+      showToast(t('fleetSentToast', data.fleetSent, data.eta));
+    }
+  });
+
+  socket.on('explosion', (data) => createExplosion(data.x, data.y, data.big));
+  socket.on('chat', (msg) => addChat(msg.from, msg.text));
+  socket.on('info', (msg) => showToast(msg));
+
+  // Самоуничтожение
+  socket.on('destroyed', () => {
+    myNick = null;
+    localStorage.removeItem('planetNick');
+    showScreen(loginScreen);
+    nickInput.value = '';
+    loginError.textContent = '';
+  });
+
+  // Поражение в бою — экран смерти
+  socket.on('defeated', (data) => {
+    myNick = null;
+    localStorage.removeItem('planetNick');
+    document.getElementById('death-killer').textContent = t('deathKillerBy', data.killedBy);
+    document.getElementById('death-res').textContent = data.lostRes;
+    document.getElementById('death-lvl').textContent = data.hadLvl;
+    document.getElementById('death-fleet').textContent = data.hadFleet;
+    respawnNick.value = '';
+    respawnError.textContent = '';
+    showScreen(deathScreen);
+  });
+
+  // ── Входящие атаки ──────────────────────────────────────
+  function checkIncoming() {
+    const incoming = missionsArr.some(m => m.type === 'attack' && m.targetNick === myNick);
+    incomingWarn.classList.toggle('active', incoming);
+  }
+
+  // ── HUD ─────────────────────────────────────────────────
+  function updateHUD() {
+    const me = playersArr.find(p => p.nick === myNick);
+    if (!me) return;
+    hudLvl.textContent = me.lvl;
+    hudRes.textContent = me.res;
+    hudFleet.textContent = me.fleet;
+    hudDef.textContent = me.defense;
+    hudMil.textContent = me.militaryLvl;
+    hudFort.textContent = me.fortLvl;
+
+    const resShort = t('resShort');
+    document.getElementById('cost-eco').textContent =
+      `${Math.floor(LVL_COST_BASE * Math.pow(LVL_COST_MULT, me.lvl - 1))} ${resShort}.`;
+    document.getElementById('cost-mil').textContent =
+      `${Math.floor(MIL_COST_BASE * Math.pow(MIL_COST_MULT, me.militaryLvl))} ${resShort}.`;
+    document.getElementById('cost-fort').textContent =
+      `${Math.floor(FORT_COST_BASE * Math.pow(FORT_COST_MULT, me.fortLvl))} ${resShort}.`;
+  }
+
+  // Кулдаун
+  setInterval(() => {
+    const me = playersArr.find(p => p.nick === myNick);
+    if (!me) return;
+    const remain = Math.max(0, ATTACK_COOLDOWN - (Date.now() - me.lastAttack));
+    if (remain > 0) {
+      hudCd.style.display = '';
+      hudCdVal.textContent = Math.ceil(remain / 1000);
+    } else {
+      hudCd.style.display = 'none';
+    }
+  }, 500);
+
+  // ── Чат / Тосты ─────────────────────────────────────────
+  function addChat(from, text) {
+    const div = document.createElement('div');
+    div.innerHTML = `<span class="from">${from}:</span> ${text}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    while (chatBox.children.length > 50) chatBox.removeChild(chatBox.firstChild);
+  }
+
+  function showToast(msg) {
+    infoToast.textContent = msg;
+    infoToast.style.display = 'block';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => infoToast.style.display = 'none', 3000);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // КНОПКИ
+  // ═══════════════════════════════════════════════════════
+
+  document.getElementById('btn-upg-eco').addEventListener('click', () => socket.emit('upgradeLvl'));
+  document.getElementById('btn-upg-mil').addEventListener('click', () => socket.emit('upgradeMilitary'));
+  document.getElementById('btn-upg-fort').addEventListener('click', () => socket.emit('upgradeFort'));
+  document.getElementById('btn-fleet1').addEventListener('click', () => socket.emit('buyFleet', 1));
+  document.getElementById('btn-fleet10').addEventListener('click', () => socket.emit('buyFleet', 10));
+  document.getElementById('btn-def5').addEventListener('click', () => socket.emit('buyDefense', 5));
+  document.getElementById('btn-center').addEventListener('click', centerOnSelf);
+  document.getElementById('btn-attack-mode').addEventListener('click', () => {
+    selecting = !selecting;
+    attackHint.style.display = selecting ? 'block' : 'none';
+  });
+  document.getElementById('btn-destruct').addEventListener('click', () => {
+    if (confirm(t('confirmDestruct'))) socket.emit('selfDestruct');
+  });
+
+  // Горячие клавиши
+  window.addEventListener('keydown', (e) => {
+    if (document.activeElement.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); centerOnSelf(); }
+    if (e.code === 'Escape') {
+      selecting = false;
+      attackHint.style.display = 'none';
+      fleetDialog.style.display = 'none';
+    }
+  });
+
+  // ── Камера ──────────────────────────────────────────────
+  function centerOnSelf() {
+    const me = playersArr.find(p => p.nick === myNick);
+    if (me) {
+      camera.x = me.x - canvas.width / 2;
+      camera.y = me.y - canvas.height / 2;
+    }
+  }
+
+  let dragging = false, dragStart = { x: 0, y: 0 };
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 2) { dragging = true; dragStart = { x: e.clientX, y: e.clientY }; }
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (dragging) {
+      camera.x -= e.clientX - dragStart.x;
+      camera.y -= e.clientY - dragStart.y;
+      dragStart = { x: e.clientX, y: e.clientY };
+    }
+  });
+  canvas.addEventListener('mouseup', (e) => { if (e.button === 2) dragging = false; });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ── Клик по canvas ──────────────────────────────────────
+  canvas.addEventListener('click', (e) => {
+    if (fleetDialog.style.display === 'block') return;
+    const wx = e.clientX + camera.x;
+    const wy = e.clientY + camera.y;
+
+    // Астероиды
+    for (const a of asteroidsArr) {
+      const dx = wx - a.x, dy = wy - a.y;
+      if (dx * dx + dy * dy < 20 * 20) {
+        socket.emit('mine', a.id);
+        return;
+      }
+    }
+
+    // Планеты
+    for (const p of playersArr) {
+      const r = planetRadius(p.lvl);
+      const dx = wx - p.x, dy = wy - p.y;
+      if (dx * dx + dy * dy < (r + 10) * (r + 10)) {
+        if (p.nick === myNick) {
+          selecting = !selecting;
+          attackHint.style.display = selecting ? 'block' : 'none';
+          return;
+        }
+        if (selecting) {
+          openFleetDialog(p.nick);
+          return;
+        }
+      }
+    }
+
+    if (selecting) { selecting = false; attackHint.style.display = 'none'; }
+  });
+
+  // ── Диалог отправки флота ───────────────────────────────
+  function openFleetDialog(targetNick) {
+    selectedTarget = targetNick;
+    fleetDialogTarget.textContent = targetNick;
+    const me = playersArr.find(p => p.nick === myNick);
+    fleetAvailSpan.textContent = me ? me.fleet : 0;
+    fleetCountInput.value = me ? me.fleet : 0;
+    fleetCountInput.max = me ? me.fleet : 0;
+    fleetDialog.style.display = 'block';
+    fleetCountInput.focus();
+    fleetCountInput.select();
+  }
+
+  document.getElementById('fleet-send-btn').addEventListener('click', () => {
+    const count = parseInt(fleetCountInput.value) || 0;
+    if (count > 0 && selectedTarget) socket.emit('attack', { target: selectedTarget, count });
+    fleetDialog.style.display = 'none';
+    selecting = false; attackHint.style.display = 'none';
+  });
+  document.getElementById('fleet-all-btn').addEventListener('click', () => {
+    const me = playersArr.find(p => p.nick === myNick);
+    if (me && me.fleet > 0 && selectedTarget) socket.emit('attack', { target: selectedTarget, count: me.fleet });
+    fleetDialog.style.display = 'none';
+    selecting = false; attackHint.style.display = 'none';
+  });
+  document.getElementById('fleet-cancel-btn').addEventListener('click', () => fleetDialog.style.display = 'none');
+  fleetCountInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('fleet-send-btn').click();
+    if (e.key === 'Escape') fleetDialog.style.display = 'none';
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // УТИЛИТЫ
+  // ═══════════════════════════════════════════════════════
+
+  function planetRadius(lvl) { return 18 + lvl * 4; }
+  function lighten(hsl, amt) {
+    const m = hsl.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
+    if (!m) return hsl;
+    return `hsl(${m[1]}, ${m[2]}%, ${Math.min(100, parseFloat(m[3]) + amt)}%)`;
+  }
+  function darken(hsl, amt) {
+    const m = hsl.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
+    if (!m) return hsl;
+    return `hsl(${m[1]}, ${m[2]}%, ${Math.max(0, parseFloat(m[3]) - amt)}%)`;
+  }
+
+  function createExplosion(x, y, big) {
+    const count = big ? 60 : 25;
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * (big ? 5 : 3) + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1,
+        color: big
+          ? `hsl(${Math.random()*60+10}, 100%, ${50+Math.random()*30}%)`
+          : `hsl(${Math.random()*40+200}, 80%, 60%)`
+      });
+    }
+    explosions.push({ particles });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // РЕНДЕР
+  // ═══════════════════════════════════════════════════════
+
+  function draw() {
+    animFrame++;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bloomCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawNebulae();
+    drawStars();
+    drawComets();
+    drawGrid();
+    drawAsteroids();
+    drawMissions();
+    drawPlanets();
+    drawExplosions();
+    drawMinimap();
+
+    requestAnimationFrame(draw);
+  }
+
+  function drawNebulae() {
+    for (const n of nebulae) {
+      const sx = n.x - camera.x, sy = n.y - camera.y;
+      if (sx < -n.r*2 || sx > canvas.width+n.r*2 || sy < -n.r*2 || sy > canvas.height+n.r*2) continue;
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, n.r);
+      grad.addColorStop(0, `hsla(${n.hue}, 60%, 40%, ${n.alpha})`);
+      grad.addColorStop(0.5, `hsla(${n.hue+30}, 50%, 30%, ${n.alpha*0.5})`);
+      grad.addColorStop(1, `hsla(${n.hue}, 40%, 20%, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(sx, sy, n.r, 0, Math.PI*2); ctx.fill();
+      bloomCtx.fillStyle = grad;
+      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, n.r, 0, Math.PI*2); bloomCtx.fill();
+    }
+  }
+
+  function drawStars() {
+    for (const layer of starLayers) {
+      for (const s of layer.stars) {
+        const sx = s.x - camera.x * layer.speed;
+        const sy = s.y - camera.y * layer.speed;
+        const wx = ((sx % canvas.width) + canvas.width) % canvas.width;
+        const wy = ((sy % canvas.height) + canvas.height) % canvas.height;
+        ctx.globalAlpha = Math.max(0.05, layer.alpha + Math.sin(animFrame*0.03+s.flicker)*0.15);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(wx, wy, s.r, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawComets() {
+    for (let i = comets.length-1; i >= 0; i--) {
+      const c = comets[i];
+      c.x += c.vx; c.y += c.vy;
+      const sx = c.x - camera.x, sy = c.y - camera.y;
+      const tailX = sx - c.vx*c.tailLen, tailY = sy - c.vy*c.tailLen;
+      const grad = ctx.createLinearGradient(sx, sy, tailX, tailY);
+      grad.addColorStop(0, `hsla(${c.hue},80%,70%,.8)`);
+      grad.addColorStop(1, `hsla(${c.hue},60%,40%,0)`);
+      ctx.strokeStyle = grad; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tailX, tailY); ctx.stroke();
+      ctx.fillStyle = `hsla(${c.hue},90%,80%,.9)`;
+      ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI*2); ctx.fill();
+      bloomCtx.fillStyle = `hsla(${c.hue},90%,70%,.6)`;
+      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, 4, 0, Math.PI*2); bloomCtx.fill();
+      if (c.x < -200 || c.x > MAP_W+200 || c.y < -200 || c.y > MAP_H+200) comets[i] = spawnComet();
+    }
+    if (Math.random() < 0.002 && comets.length < 5) comets.push(spawnComet());
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
+    const gs = 200, offX = -camera.x%gs, offY = -camera.y%gs;
+    for (let gx = offX; gx < canvas.width; gx += gs) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,canvas.height); ctx.stroke(); }
+    for (let gy = offY; gy < canvas.height; gy += gs) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(canvas.width,gy); ctx.stroke(); }
+  }
+
+  function drawAsteroids() {
+    for (const a of asteroidsArr) {
+      const sx = a.x-camera.x, sy = a.y-camera.y;
+      if (sx < -30 || sx > canvas.width+30 || sy < -30 || sy > canvas.height+30) continue;
+      ctx.fillStyle = '#8d6e63'; ctx.shadowColor = '#ff8f00'; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#a1887f';
+      ctx.beginPath(); ctx.arc(sx-3, sy-2, 6, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fdd835'; ctx.font = '9px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText(`${a.res}`, sx, sy-14);
+      bloomCtx.fillStyle = 'rgba(255,143,0,.3)';
+      bloomCtx.beginPath(); bloomCtx.arc(sx, sy, 14, 0, Math.PI*2); bloomCtx.fill();
+    }
+  }
+
+  function drawMissions() {
+    for (const m of missionsArr) {
+      const sx = m.x-camera.x, sy = m.y-camera.y;
+      const stx = m.tx-camera.x, sty = m.ty-camera.y;
+      if (m.type === 'attack') {
+        ctx.setLineDash([4,6]); ctx.strokeStyle = 'rgba(255,82,82,.2)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(stx,sty); ctx.stroke(); ctx.setLineDash([]);
+        const angle = Math.atan2(m.ty-m.y, m.tx-m.x);
+        for (let fi = 0; fi < 3; fi++) {
+          const spread = (fi-1)*5;
+          const fx = sx + Math.cos(angle+Math.PI/2)*spread;
+          const fy = sy + Math.sin(angle+Math.PI/2)*spread;
+          ctx.fillStyle = '#ff5252';
+          ctx.beginPath(); ctx.arc(fx, fy, 3, 0, Math.PI*2); ctx.fill();
+        }
+        const tailX = sx-Math.cos(angle)*20, tailY = sy-Math.sin(angle)*20;
+        const grad = ctx.createLinearGradient(sx,sy,tailX,tailY);
+        grad.addColorStop(0,'rgba(255,82,82,.5)'); grad.addColorStop(1,'rgba(255,82,82,0)');
+        ctx.strokeStyle = grad; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tailX,tailY); ctx.stroke();
+        bloomCtx.fillStyle = 'rgba(255,82,82,.5)';
+        bloomCtx.beginPath(); bloomCtx.arc(sx,sy,8,0,Math.PI*2); bloomCtx.fill();
+        ctx.fillStyle = '#ff8a80'; ctx.font = '9px Segoe UI'; ctx.textAlign = 'center';
+        ctx.fillText(m.owner, sx, sy-10);
+      } else {
+        const angle = Math.atan2(m.ty-m.y, m.tx-m.x);
+        ctx.fillStyle = m.type === 'return' ? '#66bb6a' : '#fdd835';
+        ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI*2); ctx.fill();
+        const tailX = sx-Math.cos(angle)*12, tailY = sy-Math.sin(angle)*12;
+        const col = m.type === 'return' ? '102,187,106' : '253,216,53';
+        const grad = ctx.createLinearGradient(sx,sy,tailX,tailY);
+        grad.addColorStop(0,`rgba(${col},.4)`); grad.addColorStop(1,`rgba(${col},0)`);
+        ctx.strokeStyle = grad; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tailX,tailY); ctx.stroke();
+      }
+    }
+  }
+
+  function drawPlanets() {
+    for (const p of playersArr) drawPlanet(p);
+  }
+
+  function drawPlanet(p) {
+    const sx = p.x-camera.x, sy = p.y-camera.y;
+    const r = planetRadius(p.lvl);
+    if (sx < -r*4 || sx > canvas.width+r*4 || sy < -r*4 || sy > canvas.height+r*4) return;
+    const isMe = p.nick === myNick;
+    const pulse = 1 + Math.sin(animFrame*0.04+p.x)*0.02;
+    const pr = r * pulse;
+
+    ctx.shadowColor = p.color; ctx.shadowBlur = 25;
+    const grad = ctx.createRadialGradient(sx-pr*.3, sy-pr*.3, pr*.1, sx, sy, pr);
+    grad.addColorStop(0, lighten(p.color,40));
+    grad.addColorStop(0.6, p.color);
+    grad.addColorStop(1, darken(p.color,45));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(sx, sy, pr, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    bloomCtx.shadowColor = p.color; bloomCtx.shadowBlur = 30;
+    bloomCtx.fillStyle = p.color; bloomCtx.globalAlpha = .4;
+    bloomCtx.beginPath(); bloomCtx.arc(sx,sy,pr,0,Math.PI*2); bloomCtx.fill();
+    bloomCtx.shadowBlur = 0; bloomCtx.globalAlpha = 1;
+
+    const atmGrad = ctx.createRadialGradient(sx,sy,pr,sx,sy,pr+6);
+    const ac = isMe ? '124,77,255' : '200,200,255';
+    atmGrad.addColorStop(0,`rgba(${ac},.25)`); atmGrad.addColorStop(1,`rgba(${ac},0)`);
+    ctx.fillStyle = atmGrad;
+    ctx.beginPath(); ctx.arc(sx,sy,pr+6,0,Math.PI*2); ctx.fill();
+
+    if (p.defense > 0) {
+      ctx.strokeStyle = `rgba(77,208,225,${Math.min(.4, p.defense*.01)})`;
+      ctx.lineWidth = 2; ctx.setLineDash([6,3]);
+      ctx.beginPath(); ctx.arc(sx,sy,pr+8,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    if (selecting && !isMe) {
+      ctx.strokeStyle = 'rgba(255,82,82,.5)'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+      ctx.beginPath(); ctx.arc(sx,sy,pr+12,animFrame*.05,animFrame*.05+Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    if (p.lvl > 4) {
+      const rc = Math.min(p.lvl-4, 3);
+      for (let ri = 0; ri < rc; ri++) {
+        ctx.strokeStyle = `rgba(255,255,255,${.12-ri*.03})`; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(sx,sy,pr+14+ri*7,(pr+14+ri*7)*.3,.3,0,Math.PI*2); ctx.stroke();
+      }
+    }
+
+    const mc = Math.min(p.lvl, 8);
+    for (let mi = 0; mi < mc; mi++) {
+      const ma = (animFrame*.01*(1+mi*.3)) + (mi*Math.PI*2/mc);
+      const md = pr+20+mi*5;
+      ctx.fillStyle = 'rgba(200,200,220,.75)';
+      ctx.beginPath(); ctx.arc(sx+Math.cos(ma)*md, sy+Math.sin(ma)*md*.55, 2.5, 0, Math.PI*2); ctx.fill();
+    }
+
+    if (p.fleet > 0) {
+      const fs = Math.min(p.fleet, 24);
+      for (let fi = 0; fi < fs; fi++) {
+        const fa = (animFrame*.025)+(fi*Math.PI*2/fs), fd = pr+10;
+        ctx.fillStyle = isMe ? 'rgba(124,77,255,.9)' : 'rgba(255,200,50,.7)';
+        ctx.fillRect(sx+Math.cos(fa)*fd-1.5, sy+Math.sin(fa)*fd-1.5, 3, 3);
+      }
+    }
+
+    ctx.fillStyle = isMe ? '#b388ff' : (p.online ? '#ccc' : '#555');
+    ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(p.nick, sx, sy-pr-12);
+    ctx.fillStyle = '#888'; ctx.font = '10px Segoe UI';
+    ctx.fillText(`ур.${p.lvl}  F:${p.fleet}  D:${p.defense}`, sx, sy+pr+18);
+  }
+
+  function drawExplosions() {
+    for (let i = explosions.length-1; i >= 0; i--) {
+      const exp = explosions[i]; let allDead = true;
+      for (const part of exp.particles) {
+        part.x += part.vx; part.y += part.vy;
+        part.vx *= .98; part.vy *= .98; part.life -= .015;
+        if (part.life <= 0) continue; allDead = false;
+        const sx = part.x-camera.x, sy = part.y-camera.y;
+        ctx.globalAlpha = part.life; ctx.fillStyle = part.color;
+        ctx.beginPath(); ctx.arc(sx,sy,3.5*part.life,0,Math.PI*2); ctx.fill();
+        bloomCtx.globalAlpha = part.life*.6; bloomCtx.fillStyle = part.color;
+        bloomCtx.beginPath(); bloomCtx.arc(sx,sy,6*part.life,0,Math.PI*2); bloomCtx.fill();
+      }
+      ctx.globalAlpha = 1; bloomCtx.globalAlpha = 1;
+      if (allDead) explosions.splice(i, 1);
+    }
+  }
+
+  function drawMinimap() {
+    const mw = mmCanvas.width, mh = mmCanvas.height;
+    const sx = mw/MAP_W, sy = mh/MAP_H;
+    mmCtx.clearRect(0,0,mw,mh);
+    mmCtx.fillStyle = 'rgba(10,10,26,.7)'; mmCtx.fillRect(0,0,mw,mh);
+    for (const a of asteroidsArr) { mmCtx.fillStyle = '#ff8f00'; mmCtx.fillRect(a.x*sx-1,a.y*sy-1,2,2); }
+    for (const m of missionsArr) { mmCtx.fillStyle = m.type==='attack'?'#ff5252':'#fdd835'; mmCtx.fillRect(m.x*sx-1,m.y*sy-1,2,2); }
+    for (const p of playersArr) {
+      const isMe = p.nick === myNick;
+      mmCtx.fillStyle = isMe ? '#b388ff' : (p.online ? p.color : '#444');
+      mmCtx.beginPath(); mmCtx.arc(p.x*sx, p.y*sy, isMe?3:2, 0, Math.PI*2); mmCtx.fill();
+    }
+    mmCtx.strokeStyle = 'rgba(124,77,255,.6)'; mmCtx.lineWidth = 1;
+    mmCtx.strokeRect(camera.x*sx, camera.y*sy, canvas.width*sx, canvas.height*sy);
+  }
+
+  mmCanvas.addEventListener('click', (e) => {
+    const rect = mmCanvas.getBoundingClientRect();
+    camera.x = ((e.clientX-rect.left)/mmCanvas.width)*MAP_W - canvas.width/2;
+    camera.y = ((e.clientY-rect.top)/mmCanvas.height)*MAP_H - canvas.height/2;
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>

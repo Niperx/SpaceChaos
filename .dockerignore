@@ -1,0 +1,6 @@
+node_modules
+.claude
+.git
+.gitignore
+.dockerignore
+.agent
